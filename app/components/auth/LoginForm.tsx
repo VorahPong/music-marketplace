@@ -19,10 +19,23 @@ export default function LoginForm() {
 		setLoading(true);
 
 		try {
-			// Temporary fake login flow
-			// Replace this later with NextAuth signIn or your own login API
 			if (!email || !password) {
 				setError("Email and password are required.");
+				return;
+			}
+
+			const res = await fetch("/api/login", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ email, password }),
+			});
+			
+			const data = await res.json();
+
+			if (!res.ok) {
+				setError(data.error || "Login failed. Please try again.");
 				return;
 			}
 
