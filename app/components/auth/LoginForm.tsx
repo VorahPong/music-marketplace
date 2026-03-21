@@ -56,7 +56,7 @@ export default function LoginForm() {
 					value={email}
 					onChange={(e) => setEmail(e.target.value)}
 					placeholder="you@example.com"
-					className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm outline-none transition focus:border-zinc-500"
+					className="w-full rounded-xl border border-zinc-700 bg-[#4FAF8ED] px-4 py-3 text-sm outline-none transition focus:border-zinc-500"
 					required
 				/>
 			</div>
@@ -68,7 +68,7 @@ export default function LoginForm() {
 					value={password}
 					onChange={(e) => setPassword(e.target.value)}
 					placeholder="Enter your password"
-					className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm outline-none transition focus:border-zinc-500"
+					className="w-full rounded-xl border border-zinc-700 bg-[#4FAF8ED] px-4 py-3 text-sm outline-none transition focus:border-zinc-500"
 					required
 				/>
 			</div>
