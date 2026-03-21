@@ -1,17 +1,45 @@
 "use client";
 
-import { useState } from "react";
-import { Menu, Search, Plus, Bell } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Menu, Search, Plus, Bell, LogOut, Settings, User } from "lucide-react";
 import Sidebar from "./SideBar";
+import Link from "next/link";
 
-export default function NavigationBar() {
+type NavigationBarProps = {
+	user: {
+		id: string;
+		name: string | null;
+		email: string;
+	} | null;
+};
+
+export default function NavigationBar({ user }: NavigationBarProps) {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+	const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+	const profileRef = useRef<HTMLDivElement | null>(null);
+
+	useEffect(() => {
+		function handleClickOutside(event: MouseEvent) {
+			if (
+				profileRef.current &&
+				!profileRef.current.contains(event.target as Node)
+			) {
+				setIsProfileOpen(false);
+			}
+		}
+
+		document.addEventListener("mousedown", handleClickOutside);
+		return () => {
+			document.removeEventListener("mousedown", handleClickOutside);
+		};
+	}, []);
 
 	return (
 		<>
 			<Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
-			<div className="w-full bg-[#4E3523] px-6 py-3 flex items-center justify-between">
+			<div className="relative w-full bg-[#4E3523] px-6 py-3 flex items-center justify-between">
 				<div className="flex items-center gap-4">
 					<button
 						className="text-[#FAF8ED]"
@@ -35,21 +63,85 @@ export default function NavigationBar() {
 				</div>
 
 				<div className="flex items-center gap-4">
-					<button className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523] hover:opacity-90">
-						<Plus size={16} />
-						Create
-					</button>
+					<Link href="/dashboard/create">
+						<button className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523] hover:opacity-90">
+							<Plus size={16} />
+							Create
+						</button>
+					</Link>
 
 					<button className="text-[#FAF8ED]">
 						<Bell size={20} />
 					</button>
 
-					<div className="h-8 w-8 overflow-hidden rounded-full bg-gray-300">
-						<img
-							src="https://i.pravatar.cc/100"
-							alt="profile"
-							className="h-full w-full object-cover"
-						/>
+					<div className="relative" ref={profileRef}>
+						<button
+							onClick={() => {
+								if (!user) {
+									window.location.href = "/auth/login";
+									return;
+								}
+								setIsProfileOpen((prev) => !prev);
+							}}
+							className="h-8 w-8 overflow-hidden rounded-full bg-gray-300 ring-2 ring-transparent transition hover:ring-[#FAF8ED]/60 flex items-center justify-center"
+						>
+							{user ? (
+								<img
+									src={`https://i.pravatar.cc/100?u=${user.id}`}
+									alt="profile"
+									className="h-full w-full object-cover"
+								/>
+							) : (
+								<span className="text-[#4E3523] text-sm font-semibold">?</span>
+							)}
+						</button>
+
+						{isProfileOpen && (
+							<div className="absolute right-0 top-12 z-50 w-56 rounded-2xl border border-[#E5DED6] bg-[#FAF8ED] p-2 shadow-xl">
+								<div className="border-b border-[#E5DED6] px-3 py-3">
+									<p className="text-sm font-semibold text-[#4E3523]">
+										Vorahpong Mean
+									</p>
+									<p className="text-xs text-[#4E3523]/70">@vorahpong</p>
+								</div>
+
+								<div className="mt-2 flex flex-col">
+									<Link
+										href="/channel"
+										className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
+										onClick={() => setIsProfileOpen(false)}
+									>
+										<User size={16} />
+										View Channel
+									</Link>
+
+									<Link
+										href="/settings"
+										className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
+										onClick={() => setIsProfileOpen(false)}
+									>
+										<Settings size={16} />
+										Settings
+									</Link>
+
+									<button
+										className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
+										onClick={async () => {
+											try {
+												await fetch("/api/logout", { method: "POST" });
+												setIsProfileOpen(false);
+												window.location.href = "/";
+											} catch (error) {
+												console.error("Logout failed:", error);
+											}
+										}}
+									>
+										<LogOut size={16} />
+										Logout
+									</button>
+								</div>
+							</div>
+						)}
 					</div>
 				</div>
 			</div>

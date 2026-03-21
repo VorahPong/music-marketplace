@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import { authConfig } from "@/lib/auth";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
@@ -17,12 +20,6 @@ export async function POST(req: Request) {
 
 		const user = await prisma.user.findUnique({
 			where: { email },
-			select: {
-				id: true,
-				name: true,
-				email: true,
-				passwordHash: true,
-			},
 		});
 
 		if (!user) {
@@ -41,17 +38,34 @@ export async function POST(req: Request) {
 			);
 		}
 
-		return NextResponse.json(
-			{
-				message: "Login successful.",
-				user: {
-					id: user.id,
-					name: user.name,
-					email: user.email,
-				},
+		const token = crypto.randomBytes(32).toString("hex");
+		const expiresAt = new Date(Date.now() + authConfig.sessionDurationMs);
+
+		await prisma.session.create({
+			data: {
+				token,
+				userId: user.id,
+				expiresAt,
 			},
-			{ status: 200 },
-		);
+		});
+
+		const cookieStore = await cookies();
+		cookieStore.set(authConfig.sessionCookieName, token, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === "production",
+			sameSite: "lax",
+			expires: expiresAt,
+			path: "/",
+		});
+
+		return NextResponse.json({
+			message: "Login successful.",
+			user: {
+				id: user.id,
+				name: user.name,
+				email: user.email,
+			},
+		});
 	} catch (error) {
 		console.error("Login error:", error);
 

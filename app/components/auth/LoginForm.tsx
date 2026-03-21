@@ -39,7 +39,7 @@ export default function LoginForm() {
 				return;
 			}
 
-			router.push("/dashboard");
+			router.push("/");
 		} catch {
 			setError("Login failed. Please try again.");
 		} finally {
