@@ -40,13 +40,25 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 			<Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 
 			<div className="relative w-full bg-[#4E3523] px-6 py-3 flex items-center justify-between">
-				<div className="flex items-center gap-4">
+				<div className="flex items-center gap-6">
+					{/* Menu */}
 					<button
 						className="text-[#FAF8ED]"
 						onClick={() => setIsSidebarOpen(true)}
 					>
-						<Menu size={24} />
+						<Menu size={22} />
 					</button>
+
+					{/* Logo */}
+					<Link href="/">
+						<img
+							src="/icons/musicworld.png"
+							alt="Music World logo"
+							className="h-10 w-20 object-contain cursor-pointer"
+						/>
+					</Link>
+
+
 				</div>
 
 				<div className="mx-6 flex-1 max-w-xl">
