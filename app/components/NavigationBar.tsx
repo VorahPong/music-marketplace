@@ -57,8 +57,6 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 							className="h-10 w-20 object-contain cursor-pointer"
 						/>
 					</Link>
-
-
 				</div>
 
 				<div className="mx-6 flex-1 max-w-xl">
@@ -119,7 +117,7 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 
 								<div className="mt-2 flex flex-col">
 									<Link
-										href="/channel"
+										href={user ? `/channel/${user.id}` : "/auth/login"}
 										className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
 										onClick={() => setIsProfileOpen(false)}
 									>
@@ -128,7 +126,7 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 									</Link>
 
 									<Link
-										href="/settings"
+										href={user ? `/settings` : "/auth/login"}
 										className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
 										onClick={() => setIsProfileOpen(false)}
 									>
