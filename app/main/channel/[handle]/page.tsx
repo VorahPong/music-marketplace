@@ -81,7 +81,7 @@ export default async function ChannelPage({ params }: ChannelPageProps) {
 							</div>
 						) : (
 							<div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-								{channelUser.tracks.map((track) => (
+								{channelUser.tracks.map((track?: any) => (
 									<div
 										key={track.id}
 										className="rounded-2xl border border-[#D6CFC7] bg-white p-5 shadow-sm"

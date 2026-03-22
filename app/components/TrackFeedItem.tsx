@@ -212,7 +212,7 @@ export default function TrackFeedItem({
 							{artistName}
 						</Link>
 
-						<Link href={`/song/${track.id}`}>
+						<Link href={`/main/song/${track.id}`}>
 							<h2 className="truncate text-2xl font-semibold hover:underline">
 								{track.title}
 							</h2>

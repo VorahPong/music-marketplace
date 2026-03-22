@@ -10,6 +10,8 @@ type NavigationBarProps = {
 		id: string;
 		name: string | null;
 		email: string;
+		handle: string;
+		points: number;
 	} | null;
 };
 
@@ -82,7 +84,7 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 
 					<div className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-3 py-2 text-sm font-medium text-[#4E3523]">
 						<Coins size={16} />
-						<span>{user ? 1200 : 0} pts</span>
+						<span>{user?.points ?? 0} pts</span>
 					</div>
 
 					<button className="text-[#FAF8ED]">
@@ -115,14 +117,14 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 							<div className="absolute right-0 top-12 z-50 w-56 rounded-2xl border border-[#E5DED6] bg-[#FAF8ED] p-2 shadow-xl">
 								<div className="border-b border-[#E5DED6] px-3 py-3">
 									<p className="text-sm font-semibold text-[#4E3523]">
-										Vorahpong Mean
+										{user?.name}
 									</p>
-									<p className="text-xs text-[#4E3523]/70">@vorahpong</p>
+									<p className="text-xs text-[#4E3523]/70">@{user?.handle}</p>
 								</div>
 
 								<div className="mt-2 flex flex-col">
 									<Link
-										href={user ? `/channel/${user.id}` : "/auth/login"}
+										href={user ? `/main/channel/${user.handle}` : "/auth/login"}
 										className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
 										onClick={() => setIsProfileOpen(false)}
 									>

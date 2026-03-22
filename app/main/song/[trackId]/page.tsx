@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import NavigationBar from "@/app/components/NavigationBar";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -49,8 +48,6 @@ export default async function SongPage({ params }: SongPageProps) {
 
 	return (
 		<div className="min-h-screen bg-[#FAF8ED] text-[#4E3523]">
-			<NavigationBar user={user} />
-
 			<div className="px-6 py-10">
 				<div className="mx-auto max-w-5xl">
 					<div className="grid gap-8 md:grid-cols-[260px_1fr]">
@@ -150,7 +147,7 @@ export default async function SongPage({ params }: SongPageProps) {
 									</p>
 								</div>
 							) : (
-								track.comments.map((comment) => (
+								track.comments.map((comment?: any) => (
 									<div
 										key={comment.id}
 										className="rounded-2xl border border-[#D6CFC7] bg-[#FAF8ED] p-4"
