@@ -17,19 +17,22 @@ model User {
 
   tracks       Track[]
   sessions     Session[]
+  comments     Comment[]
 }
 
 model Track {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
   description String?
   fileUrl     String
   fileType    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   ownerId     String?
-  owner       User?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  comments    Comment[]
 }
 
 model Session {
@@ -40,4 +43,17 @@ model Session {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  trackId   String
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 }

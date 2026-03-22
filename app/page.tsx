@@ -14,6 +14,7 @@ export default async function HomePage() {
 			owner: {
 				select: {
 					name: true,
+					id: true,
 				},
 			},
 		},

@@ -8,6 +8,7 @@ import {
 	Pause,
 	Share2,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 
@@ -19,6 +20,7 @@ type TrackFeedItemProps = {
 		fileUrl: string;
 		owner?: {
 			name: string | null;
+			id: string | null;
 		} | null;
 	};
 	isGuest?: boolean;
@@ -152,8 +154,18 @@ export default function TrackFeedItem({
 					</button>
 
 					<div className="min-w-0 flex-1">
-						<p className="text-sm text-[#4E3523]/70">{artistName}</p>
-						<h2 className="truncate text-2xl font-semibold">{track.title}</h2>
+						<Link
+							href={track.owner ? `/channel/${track.owner.id}` : "#"}
+							className="text-sm text-[#4E3523]/70 hover:underline"
+						>
+							{artistName}
+						</Link>
+						
+						<Link href={`/song/${track.id}`}>
+							<h2 className="truncate text-2xl font-semibold hover:underline">
+								{track.title}
+							</h2>
+						</Link>
 
 						<div className="mt-4">
 							<div ref={waveContainerRef} className="cursor-pointer" />
