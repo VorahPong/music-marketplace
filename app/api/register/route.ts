@@ -5,13 +5,15 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
 	try {
 		const body = await req.json();
+
 		const name = body.name?.trim();
+		const handle = body.handle?.trim().toLowerCase();
 		const email = body.email?.trim().toLowerCase();
 		const password = body.password?.trim();
 
-		if (!email || !password) {
+		if (!handle || !email || !password) {
 			return NextResponse.json(
-				{ error: "Email and password are required." },
+				{ error: "Handle, email, and password are required." },
 				{ status: 400 },
 			);
 		}
@@ -23,13 +25,42 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const existing = await prisma.user.findUnique({
+		const handleRegex = /^[a-z0-9_]+$/;
+		if (!handleRegex.test(handle)) {
+			return NextResponse.json(
+				{
+					error:
+						"Handle can only contain lowercase letters, numbers, and underscores.",
+				},
+				{ status: 400 },
+			);
+		}
+
+		if (handle.length < 3 || handle.length > 20) {
+			return NextResponse.json(
+				{ error: "Handle must be between 3 and 20 characters." },
+				{ status: 400 },
+			);
+		}
+
+		const existingEmail = await prisma.user.findUnique({
 			where: { email },
 		});
 
-		if (existing) {
+		if (existingEmail) {
 			return NextResponse.json(
-				{ error: "User already exists." },
+				{ error: "An account with this email already exists." },
+				{ status: 409 },
+			);
+		}
+
+		const existingHandle = await prisma.user.findUnique({
+			where: { handle },
+		});
+
+		if (existingHandle) {
+			return NextResponse.json(
+				{ error: "Handle is already taken." },
 				{ status: 409 },
 			);
 		}
@@ -39,13 +70,15 @@ export async function POST(req: Request) {
 		const user = await prisma.user.create({
 			data: {
 				name: name || null,
+				handle,
 				email,
 				passwordHash,
 			},
 			select: {
 				id: true,
-				email: true,
 				name: true,
+				handle: true,
+				email: true,
 			},
 		});
 

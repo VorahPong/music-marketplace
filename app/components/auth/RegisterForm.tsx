@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function RegisterForm() {
 	const [name, setName] = useState("");
+	const [handle, setHandle] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 
@@ -12,13 +13,57 @@ export default function RegisterForm() {
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
 
+	const [handleAvailable, setHandleAvailable] = useState<boolean | null>(null);
+	const [checkingHandle, setCheckingHandle] = useState(false);
+	useEffect(() => {
+		if (!handle.trim()) {
+			setHandleAvailable(null);
+			setCheckingHandle(false);
+			return;
+		}
+
+		setCheckingHandle(true);
+
+		const timeout = setTimeout(async () => {
+			try {
+				const res = await fetch(`/api/handle-available?handle=${handle}`);
+				const data = await res.json();
+				setHandleAvailable(data.available);
+			} catch {
+				setHandleAvailable(null);
+			} finally {
+				setCheckingHandle(false);
+			}
+		}, 400); // debounce
+
+		return () => clearTimeout(timeout);
+	}, [handle]);
+
 	async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
 		e.preventDefault();
 		setError("");
 		setSuccess("");
 		setLoading(true);
 
+		if (checkingHandle) {
+			setError("Please wait while we check your handle.");
+			setLoading(false);
+			return;
+		}
+
+		if (handleAvailable === false) {
+			setError("Handle is already taken.");
+			setLoading(false);
+			return;
+		}
+
 		try {
+			if (!handle.trim()) {
+				setError("Handle is required.");
+				setLoading(false);
+				return;
+			}
+
 			const res = await fetch("/api/register", {
 				method: "POST",
 				headers: {
@@ -26,6 +71,7 @@ export default function RegisterForm() {
 				},
 				body: JSON.stringify({
 					name,
+					handle,
 					email,
 					password,
 				}),
@@ -38,10 +84,15 @@ export default function RegisterForm() {
 				return;
 			}
 
-			setSuccess("Account created successfully. You can now log in.");
+			setSuccess("Account created successfully. Redirecting to login...");
 			setName("");
+			setHandle("");
 			setEmail("");
 			setPassword("");
+			// Redirect after 3 seconds
+			setTimeout(() => {
+				window.location.href = "/auth/login";
+			}, 2000);
 		} catch {
 			setError("Something went wrong. Please try again.");
 		} finally {
@@ -60,6 +111,32 @@ export default function RegisterForm() {
 					placeholder="Your name"
 					className="w-full rounded-xl border border-zinc-700 px-4 py-3 text-sm outline-none transition focus:border-zinc-500"
 				/>
+			</div>
+
+			<div>
+				<label className="mb-1 block text-sm text-zinc-300">Handle</label>
+				<input
+					type="text"
+					value={handle}
+					onChange={(e) => setHandle(e.target.value.toLowerCase())}
+					placeholder="yourusername"
+					className="w-full rounded-xl border border-zinc-700 px-4 py-3 text-sm outline-none transition focus:border-zinc-500"
+					required
+				/>
+				{handle && checkingHandle && (
+					<p className="mt-1 text-xs text-zinc-400">Checking handle...</p>
+				)}
+
+				{handle && !checkingHandle && handleAvailable === true && (
+					<p className="mt-1 text-xs text-green-400">✔ Handle is available</p>
+				)}
+
+				{handle && !checkingHandle && handleAvailable === false && (
+					<p className="mt-1 text-xs text-red-400">✖ Handle is already taken</p>
+				)}
+				<p className="mt-1 text-xs text-zinc-500">
+					This will be your public URL (e.g. /channel/yourusername)
+				</p>
 			</div>
 
 			<div>

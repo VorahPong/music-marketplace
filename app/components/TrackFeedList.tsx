@@ -9,8 +9,14 @@ type TrackFeedListProps = {
 		title: string;
 		description: string | null;
 		fileUrl: string;
+		trackType?: string | null;
+		createdAt?: string | Date | null;
+		isForSale?: boolean;
+		priceInPoints?: number | null;
 		owner?: {
+			id: string;
 			name: string | null;
+			handle: string | null;
 		} | null;
 	}[];
 	isGuest: boolean;

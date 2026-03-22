@@ -22,7 +22,7 @@ type TrackFeedItemProps = {
 		createdAt?: string | Date | null;
 		owner?: {
 			name: string | null;
-			id: string | null;
+			handle: string | null;
 		} | null;
 	};
 	isGuest?: boolean;
@@ -206,7 +206,7 @@ export default function TrackFeedItem({
 
 					<div className="min-w-0 flex-1">
 						<Link
-							href={track.owner ? `/channel/${track.owner.id}` : "#"}
+							href={track.owner?.handle ? `/main/channel/${track.owner.handle}` : "#"}
 							className="text-sm text-[#4E3523]/70 hover:underline"
 						>
 							{artistName}

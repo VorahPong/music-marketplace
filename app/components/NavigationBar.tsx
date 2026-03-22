@@ -50,7 +50,7 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 					</button>
 
 					{/* Logo */}
-					<Link href="/">
+					<Link href="/main">
 						<img
 							src="/icons/musicworld.png"
 							alt="Music World logo"
@@ -73,7 +73,7 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 				</div>
 
 				<div className="flex items-center gap-4">
-					<Link href="/dashboard/create">
+					<Link href="/main/dashboard/create">
 						<button className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523] hover:opacity-90">
 							<Plus size={16} />
 							Create

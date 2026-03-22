@@ -7,6 +7,8 @@ import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
+const ALLOWED_TRACK_TYPES = ["SONG", "BEAT", "LOOP", "DRUMKIT"] as const;
+
 export async function POST(req: Request) {
 	try {
 		const user = await getCurrentUser();
@@ -19,9 +21,12 @@ export async function POST(req: Request) {
 
 		const title = formData.get("title") as string | null;
 		const description = formData.get("description") as string | null;
+		const trackTypeRaw = formData.get("trackType") as string | null;
+		const isForSaleRaw = formData.get("isForSale") as string | null;
+		const priceInPointsRaw = formData.get("priceInPoints") as string | null;
 		const file = formData.get("file") as File | null;
 
-		if (!title || !file) {
+		if (!title?.trim() || !file) {
 			return NextResponse.json(
 				{ error: "Title and audio file are required." },
 				{ status: 400 },
@@ -34,6 +39,41 @@ export async function POST(req: Request) {
 				{ error: "Only MP3 and WAV files are allowed." },
 				{ status: 400 },
 			);
+		}
+
+		const trackType = (trackTypeRaw?.toUpperCase() || "SONG") as
+			| "SONG"
+			| "BEAT"
+			| "LOOP"
+			| "DRUMKIT";
+
+		if (!ALLOWED_TRACK_TYPES.includes(trackType)) {
+			return NextResponse.json(
+				{ error: "Invalid track type." },
+				{ status: 400 },
+			);
+		}
+
+		const isForSale = isForSaleRaw === "true";
+
+		let priceInPoints: number | null = null;
+
+		if (isForSale) {
+			const parsedPrice = Number(priceInPointsRaw);
+
+			if (
+				!priceInPointsRaw ||
+				Number.isNaN(parsedPrice) ||
+				parsedPrice <= 0 ||
+				!Number.isInteger(parsedPrice)
+			) {
+				return NextResponse.json(
+					{ error: "Please provide a valid point price for sale items." },
+					{ status: 400 },
+				);
+			}
+
+			priceInPoints = parsedPrice;
 		}
 
 		const bytes = await file.arrayBuffer();
@@ -57,6 +97,9 @@ export async function POST(req: Request) {
 				description: description?.trim() || null,
 				fileUrl,
 				fileType: file.type,
+				trackType,
+				isForSale,
+				priceInPoints,
 				ownerId: user.id,
 			},
 		});
