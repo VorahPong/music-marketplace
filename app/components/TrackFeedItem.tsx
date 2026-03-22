@@ -23,6 +23,8 @@ type TrackFeedItemProps = {
 		fileUrl: string;
 		trackType?: string | null;
 		createdAt?: string | Date | null;
+		likesCount: number;
+		isLiked: boolean;
 		owner?: {
 			name: string | null;
 			handle: string | null;
@@ -52,9 +54,7 @@ export default function TrackFeedItem({
 	const artistName = track.owner?.name || "Unknown Artist";
 
 	const displayTrackType = track.trackType
-		? `#${track.trackType.charAt(0)}${track.trackType
-				.slice(1)
-				.toLowerCase()}`
+		? `#${track.trackType.charAt(0)}${track.trackType.slice(1).toLowerCase()}`
 		: "#Song";
 
 	const displayRelativeTime = formatRelativeTime(track.createdAt);
@@ -209,6 +209,40 @@ export default function TrackFeedItem({
 		return (currentTime / duration) * 100;
 	}, [currentTime, duration]);
 
+	const [liked, setLiked] = useState(track.isLiked);
+	const [likesCount, setLikesCount] = useState(track.likesCount);
+	const [likeLoading, setLikeLoading] = useState(false);
+
+	async function handleLike() {
+		if (isGuest) {
+			window.location.href = "/auth/login";
+			return;
+		}
+
+		if (likeLoading) return;
+
+		setLikeLoading(true);
+		try {
+			const response = await fetch(`/api/tracks/${track.id}/like`, {
+				method: liked ? "DELETE" : "POST",
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				console.error("Error liking track:", data.error);
+				return;
+			}
+
+			setLiked(data.liked);
+			setLikesCount(data.likeCount);
+		} catch (error) {
+			console.error("Error liking track:", error);
+		} finally {
+			setLikeLoading(false);
+		}
+	}
+
 	return (
 		<>
 			<div className="relative rounded-3xl border border-[#D6CFC7] bg-white p-4 shadow-sm">
@@ -282,11 +316,14 @@ export default function TrackFeedItem({
 
 				<div className="mt-4 flex items-center gap-3">
 					<button
-						onClick={() => handleProtectedAction("like")}
-						className="flex items-center gap-2 rounded-full px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
+						onClick={handleLike}
+						disabled={likeLoading}
+						className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm hover:bg-[#4E3523]/10 ${
+							liked ? "text-[#6B4A30] font-medium" : "text-[#4E3523]"
+						}`}
 					>
-						<Heart size={18} />
-						Like
+						<Heart size={18} fill={liked ? "currentColor" : "none"} />
+						{likesCount}
 					</button>
 
 					<button

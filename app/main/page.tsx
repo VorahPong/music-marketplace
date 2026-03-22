@@ -7,23 +7,47 @@ export default async function HomePage() {
 	const user = await getCurrentUser();
 
 	const tracks = await prisma.track.findMany({
-	orderBy: {
-		createdAt: "desc",
-	},
-	include: {
-		owner: {
-			select: {
-				id: true,
-				name: true,
-				handle: true,
-			},
+		orderBy: {
+			createdAt: "desc",
 		},
-	},
-});
+		include: {
+			owner: {
+				select: {
+					id: true,
+					name: true,
+					handle: true,
+				},
+			},
+			_count: {
+				select: {
+					likes: true,
+				},
+			},
+			likes: user
+				? {
+						where: {
+							userId: user.id,
+						},
+						select: { id: true },
+					}
+				: false,
+		},
+	});
+
+	const feedTracks = tracks.map((track : any) => ({
+		id: track.id,
+		title: track.title,
+		description: track.description,
+		fileUrl: track.fileUrl,
+		trackType: track.trackType,
+		createdAt: track.createdAt,
+		owner: track.owner,
+		likesCount: track._count.likes,
+		isLiked: Array.isArray(track.likes) ? track.likes.length > 0 : false,
+	}));
 
 	return (
 		<div className="min-h-screen bg-[#FAF8ED] text-[#4E3523]">
-
 			<div className="px-6 py-10">
 				<div className="mx-auto max-w-5xl">
 					<h1 className="text-3xl font-bold">Latest Music</h1>
@@ -39,7 +63,7 @@ export default async function HomePage() {
 							</p>
 						</div>
 					) : (
-						<TrackFeedList tracks={tracks} isGuest={!user} />
+						<TrackFeedList tracks={feedTracks} isGuest={!user} />
 					)}
 				</div>
 			</div>
