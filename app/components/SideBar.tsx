@@ -47,7 +47,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 					</Link>
 
 					<Link
-						href="/dashboard/liked"
+						href="/main/playlist/liked"
 						className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-[#FAF8ED]/10"
 						onClick={onClose}
 					>
