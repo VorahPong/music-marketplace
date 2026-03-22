@@ -12,6 +12,7 @@ model User {
   name         String?
   email        String    @unique
   passwordHash String
+  points       Int       @default(0)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -21,18 +22,21 @@ model User {
 }
 
 model Track {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  fileUrl     String
-  fileType    String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  fileUrl       String
+  fileType      String
+  trackType     TrackType @default(SONG)
+  isForSale     Boolean   @default(false)
+  priceInPoints Int?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  ownerId     String?
-  owner       User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId       String?
+  owner         User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
-  comments    Comment[]
+  comments      Comment[]
 }
 
 model Session {
@@ -56,4 +60,14 @@ model Comment {
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+}
+
+enum TrackType {
+  SONG
+  BEAT
+  LOOP
+  SAMPLE
+  STEM
+  VOCAL
+  DRUMKIT
 }

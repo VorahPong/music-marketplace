@@ -18,6 +18,8 @@ type TrackFeedItemProps = {
 		title: string;
 		description: string | null;
 		fileUrl: string;
+		trackType?: string | null;
+		createdAt?: string | Date | null;
 		owner?: {
 			name: string | null;
 			id: string | null;
@@ -42,6 +44,15 @@ export default function TrackFeedItem({
 	const [duration, setDuration] = useState(0);
 
 	const artistName = track.owner?.name || "Unknown Artist";
+
+	// ✅ safe fallback
+	const displayTrackType = track.trackType
+		? `#${track.trackType.charAt(0)}${track.trackType
+				.slice(1)
+				.toLowerCase()}`
+		: "#Song";
+
+	const displayRelativeTime = formatRelativeTime(track.createdAt);
 
 	useEffect(() => {
 		if (!waveContainerRef.current) return;
@@ -129,13 +140,57 @@ export default function TrackFeedItem({
 		return `${mins}:${secs.toString().padStart(2, "0")}`;
 	}
 
+	function formatRelativeTime(dateValue?: string | Date | null) {
+		if (!dateValue) return "Recently";
+
+		const date = new Date(dateValue);
+		if (Number.isNaN(date.getTime())) return "Recently";
+
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+		const minute = 1000 * 60;
+		const hour = minute * 60;
+		const day = hour * 24;
+		const month = day * 30;
+		const year = month * 12;
+
+		if (diffMs < minute) return "Just now";
+		if (diffMs < hour) {
+			const minutes = Math.floor(diffMs / minute);
+			return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+		}
+		if (diffMs < day) {
+			const hours = Math.floor(diffMs / hour);
+			return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+		}
+		if (diffMs < month) {
+			const days = Math.floor(diffMs / day);
+			return `${days} day${days === 1 ? "" : "s"} ago`;
+		}
+		if (diffMs < year) {
+			const months = Math.floor(diffMs / month);
+			return `${months} month${months === 1 ? "" : "s"} ago`;
+		}
+
+		const years = Math.floor(diffMs / year);
+		return `${years} year${years === 1 ? "" : "s"} ago`;
+	}
+
 	const progressPercent = useMemo(() => {
 		if (!duration) return 0;
 		return (currentTime / duration) * 100;
 	}, [currentTime, duration]);
 
 	return (
-		<div className="rounded-3xl border border-[#D6CFC7] bg-white p-4 shadow-sm">
+		<div className="relative rounded-3xl border border-[#D6CFC7] bg-white p-4 shadow-sm">
+			
+			<div className="absolute right-4 top-4 flex flex-col items-end gap-2">
+				<span className="text-xs text-[#4E3523]/60">{displayRelativeTime}</span>
+				<div className="rounded-full bg-[#FAF8ED] px-3 py-1 text-xs font-semibold text-[#4E3523] shadow-sm">
+					{displayTrackType}
+				</div>
+			</div>
+
 			<div className="flex flex-col gap-4">
 				<div className="flex items-start gap-4">
 					<div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-2xl bg-[#EAD9C7] text-[#4E3523] shadow-sm">
@@ -146,11 +201,7 @@ export default function TrackFeedItem({
 						onClick={handleTogglePlay}
 						className="mt-1 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#6B4A30] text-[#FAF8ED] shadow-md transition hover:opacity-90"
 					>
-						{isPlaying ? (
-							<Pause size={26} />
-						) : (
-							<Play size={26} className="ml-1" />
-						)}
+						{isPlaying ? <Pause size={26} /> : <Play size={26} className="ml-1" />}
 					</button>
 
 					<div className="min-w-0 flex-1">
@@ -160,7 +211,7 @@ export default function TrackFeedItem({
 						>
 							{artistName}
 						</Link>
-						
+
 						<Link href={`/song/${track.id}`}>
 							<h2 className="truncate text-2xl font-semibold hover:underline">
 								{track.title}
@@ -168,7 +219,7 @@ export default function TrackFeedItem({
 						</Link>
 
 						<div className="mt-4">
-							<div ref={waveContainerRef} className="cursor-pointer" />
+							<div ref={waveContainerRef} />
 
 							<div className="mt-3 flex items-center gap-3">
 								<span className="w-12 text-xs text-[#4E3523]/70">
@@ -177,7 +228,7 @@ export default function TrackFeedItem({
 
 								<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#E7DED5]">
 									<div
-										className="h-full rounded-full bg-[#6B4A30] transition-all"
+										className="h-full rounded-full bg-[#6B4A30]"
 										style={{ width: `${progressPercent}%` }}
 									/>
 								</div>
@@ -191,6 +242,7 @@ export default function TrackFeedItem({
 				</div>
 			</div>
 
+			{/* ACTIONS */}
 			<div className="mt-4 flex items-center gap-3">
 				<button
 					onClick={() => handleProtectedAction("like")}
@@ -217,6 +269,23 @@ export default function TrackFeedItem({
 					<Share2 size={18} />
 					Share
 				</button>
+
+				{/* Support / Buy */}
+				{track.trackType === "BEAT" ? (
+					<button
+						onClick={() => handleProtectedAction("buy")}
+						className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED]"
+					>
+						Buy (10 pts)
+					</button>
+				) : (
+					<button
+						onClick={() => handleProtectedAction("support")}
+						className="flex items-center gap-2 rounded-full border border-[#4E3523] px-4 py-2 text-sm font-medium text-[#4E3523]"
+					>
+						Support
+					</button>
+				)}
 			</div>
 		</div>
 	);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Menu, Search, Plus, Bell, LogOut, Settings, User } from "lucide-react";
+import { Menu, Search, Plus, Bell, LogOut, Settings, User, Coins } from "lucide-react";
 import Sidebar from "./SideBar";
 import Link from "next/link";
 
@@ -79,6 +79,11 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 							Create
 						</button>
 					</Link>
+
+					<div className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-3 py-2 text-sm font-medium text-[#4E3523]">
+						<Coins size={16} />
+						<span>{user ? 1200 : 0} pts</span>
+					</div>
 
 					<button className="text-[#FAF8ED]">
 						<Bell size={20} />
