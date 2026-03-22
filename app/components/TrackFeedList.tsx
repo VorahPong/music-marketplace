@@ -11,6 +11,8 @@ type TrackFeedListProps = {
 		fileUrl: string;
 		trackType?: string | null;
 		createdAt?: string | Date | null;
+		likesCount: number;
+		isLiked: boolean;
 		isForSale?: boolean;
 		priceInPoints?: number | null;
 		owner?: {
