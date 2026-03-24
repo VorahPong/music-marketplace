@@ -14,6 +14,7 @@ type PlayerTrack = {
 	title: string;
 	fileUrl: string;
 	artistName: string;
+	artistHandle?: string | null;
 	trackType?: string | null;
 };
 

@@ -124,6 +124,7 @@ export default function TrackFeedItem({
 			fileUrl: track.fileUrl,
 			artistName,
 			trackType: track.trackType,
+			artistHandle: track.owner?.handle ?? null,
 		});
 
 		setTimeout(() => {
@@ -154,6 +155,7 @@ export default function TrackFeedItem({
 			fileUrl: track.fileUrl,
 			artistName,
 			trackType: track.trackType,
+			artistHandle: track.owner?.handle ?? null,
 		});
 	}
 

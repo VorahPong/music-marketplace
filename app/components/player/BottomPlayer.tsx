@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Pause, Play, Volume2 } from "lucide-react";
 import { usePlayer } from "./PlayerProvider";
 
@@ -30,12 +31,25 @@ export default function BottomPlayer() {
 		<div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[#D6CFC7] bg-white/95 backdrop-blur">
 			<div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
 				<div className="min-w-0 md:w-64">
-					<p className="truncate text-sm text-[#4E3523]/70">
-						{currentTrack.artistName}
-					</p>
-					<h3 className="truncate text-base font-semibold text-[#4E3523]">
+					{currentTrack.artistHandle ? (
+						<Link
+							href={`/main/channel/${currentTrack.artistHandle}`}
+							className="block truncate text-sm text-[#4E3523]/70 hover:underline"
+						>
+							{currentTrack.artistName}
+						</Link>
+					) : (
+						<p className="truncate text-sm text-[#4E3523]/70">
+							{currentTrack.artistName}
+						</p>
+					)}
+
+					<Link
+						href={`/main/song/${currentTrack.id}`}
+						className="block truncate text-base font-semibold text-[#4E3523] hover:underline"
+					>
 						{currentTrack.title}
-					</h3>
+					</Link>
 				</div>
 
 				<div className="flex flex-1 flex-col items-center gap-3">
@@ -58,7 +72,7 @@ export default function BottomPlayer() {
 							step={0.1}
 							value={currentTime}
 							onChange={(e) => seekTo(Number(e.target.value))}
-							className="w-full"
+							className="brown-slider w-full"
 						/>
 
 						<span className="w-12 text-right text-xs text-[#4E3523]/70">
@@ -76,10 +90,16 @@ export default function BottomPlayer() {
 						step={0.01}
 						value={volume}
 						onChange={(e) => setVolumeLevel(Number(e.target.value))}
-						className="w-28"
+						className="brown-slider w-28"
 					/>
 				</div>
 			</div>
+
+			<style jsx>{`
+				.brown-slider {
+					accent-color: #6b4a30;
+				}
+			`}</style>
 		</div>
 	);
 }
