@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import TrackFeedItem from "./TrackFeedItem";
 
 type TrackFeedListProps = {
@@ -25,22 +24,11 @@ type TrackFeedListProps = {
 	isGuest: boolean;
 };
 
-export default function TrackFeedList({
-	tracks,
-	isGuest,
-}: TrackFeedListProps) {
-	const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
-
+export default function TrackFeedList({ tracks, isGuest }: TrackFeedListProps) {
 	return (
 		<div className="mt-8 space-y-6">
 			{tracks.map((track) => (
-				<TrackFeedItem
-					key={track.id}
-					track={track}
-					isGuest={isGuest}
-					isActive={activeTrackId === track.id}
-					onPlayRequest={setActiveTrackId}
-				/>
+				<TrackFeedItem key={track.id} track={track} isGuest={isGuest} />
 			))}
 		</div>
 	);

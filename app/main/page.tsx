@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import NavigationBar from "../components/NavigationBar";
 import { getCurrentUser } from "@/lib/auth";
 import TrackFeedList from "../components/TrackFeedList";
 
