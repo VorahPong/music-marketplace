@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import CommentForm from "@/app/components/CommentForm";
 
 type SongPageProps = {
 	params: Promise<{
@@ -23,6 +24,7 @@ export default async function SongPage({ params }: SongPageProps) {
 					id: true,
 					name: true,
 					email: true,
+					handle: true,
 				},
 			},
 			comments: {
@@ -35,6 +37,7 @@ export default async function SongPage({ params }: SongPageProps) {
 							id: true,
 							name: true,
 							email: true,
+							handle: true,
 						},
 					},
 				},
@@ -61,7 +64,11 @@ export default async function SongPage({ params }: SongPageProps) {
 							<p className="text-sm text-[#4E3523]/70">
 								{track.owner ? (
 									<Link
-										href={`/channel/${track.owner.id}`}
+										href={
+											track.owner.handle
+												? `/main/channel/${track.owner.handle}`
+												: "#"
+										}
 										className="hover:underline"
 									>
 										{track.owner.name || track.owner.email}
@@ -118,25 +125,7 @@ export default async function SongPage({ params }: SongPageProps) {
 							</div>
 						)}
 
-						{user && (
-							<form className="mt-6">
-								<textarea
-									placeholder="Write a comment..."
-									className="w-full rounded-2xl border border-[#D6CFC7] bg-[#FAF8ED] px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
-									rows={4}
-									disabled
-								/>
-								<button
-									type="button"
-									className="mt-3 rounded-full bg-[#4E3523] px-5 py-2 text-sm font-medium text-[#FAF8ED] opacity-60"
-								>
-									Post Comment
-								</button>
-								<p className="mt-2 text-xs text-[#4E3523]/60">
-									Comment posting UI is here. Next we can wire the API.
-								</p>
-							</form>
-						)}
+						{user && <CommentForm trackId={track.id} />}
 
 						<div className="mt-8 space-y-4">
 							{track.comments.length === 0 ? (
@@ -147,7 +136,7 @@ export default async function SongPage({ params }: SongPageProps) {
 									</p>
 								</div>
 							) : (
-								track.comments.map((comment?: any) => (
+								track.comments.map((comment) => (
 									<div
 										key={comment.id}
 										className="rounded-2xl border border-[#D6CFC7] bg-[#FAF8ED] p-4"

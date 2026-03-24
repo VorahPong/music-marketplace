@@ -21,6 +21,7 @@ export default async function HomePage() {
 			_count: {
 				select: {
 					likes: true,
+					comments: true,
 				},
 			},
 			likes: user
@@ -44,6 +45,7 @@ export default async function HomePage() {
 		owner: track.owner,
 		likesCount: track._count.likes,
 		isLiked: Array.isArray(track.likes) ? track.likes.length > 0 : false,
+		commentCount: track._count.comments,
 	}));
 
 	return (

@@ -13,6 +13,7 @@ type TrackFeedListProps = {
 		createdAt?: string | Date | null;
 		likesCount: number;
 		isLiked: boolean;
+		commentCount: number;
 		isForSale?: boolean;
 		priceInPoints?: number | null;
 		owner?: {
