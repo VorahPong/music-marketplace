@@ -1,5 +1,7 @@
 import NavigationBar from "../components/NavigationBar";
 import { getCurrentUser } from "@/lib/auth";
+import { PlayerProvider } from "../components/player/PlayerProvider";
+import BottomPlayer from "../components/player/BottomPlayer";
 
 export default async function RootLayout({
 	children,
@@ -9,11 +11,12 @@ export default async function RootLayout({
 	const user = await getCurrentUser();
 
 	return (
-		<html lang="en">
-			<body className="bg-[#FAF8ED] text-[#4E3523]">
+		<PlayerProvider>
+			<div className="min-h-screen bg-[#FAF8ED] pb-28 text-[#4E3523]">
 				<NavigationBar user={user} />
 				{children}
-			</body>
-		</html>
+				<BottomPlayer />
+			</div>
+		</PlayerProvider>
 	);
 }

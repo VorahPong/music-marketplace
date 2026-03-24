@@ -7,13 +7,12 @@ import {
 	Play,
 	Pause,
 	Share2,
-	X,
-	Copy,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import ShareTrackModal from "./ShareTrackModal";
+import { usePlayer } from "./player/PlayerProvider";
 
 type TrackFeedItemProps = {
 	track: {
@@ -32,25 +31,24 @@ type TrackFeedItemProps = {
 		} | null;
 	};
 	isGuest?: boolean;
-	isActive: boolean;
-	onPlayRequest: (trackId: string) => void;
 };
 
 export default function TrackFeedItem({
 	track,
 	isGuest = true,
-	isActive,
-	onPlayRequest,
 }: TrackFeedItemProps) {
 	const waveContainerRef = useRef<HTMLDivElement | null>(null);
 	const waveSurferRef = useRef<WaveSurfer | null>(null);
 
-	const [isPlaying, setIsPlaying] = useState(false);
-	const [currentTime, setCurrentTime] = useState(0);
-	const [duration, setDuration] = useState(0);
-
 	const [isShareOpen, setIsShareOpen] = useState(false);
 	const [copyMessage, setCopyMessage] = useState("");
+
+	const [liked, setLiked] = useState(track.isLiked);
+	const [likesCount, setLikesCount] = useState(track.likesCount);
+	const [likeLoading, setLikeLoading] = useState(false);
+
+	const { currentTrack, isPlaying, currentTime, duration, playTrack, seekTo } =
+		usePlayer();
 
 	const artistName = track.owner?.name || "Unknown Artist";
 
@@ -64,6 +62,9 @@ export default function TrackFeedItem({
 		typeof window !== "undefined"
 			? `${window.location.origin}/main/song/${track.id}`
 			: `/main/song/${track.id}`;
+
+	const isCurrentTrack = currentTrack?.id === track.id;
+	const isThisTrackPlaying = isCurrentTrack && isPlaying;
 
 	useEffect(() => {
 		if (!waveContainerRef.current) return;
@@ -79,30 +80,10 @@ export default function TrackFeedItem({
 			progressColor: "#6B4A30",
 			cursorWidth: 0,
 			normalize: true,
+			interact: true,
 		});
 
 		waveSurferRef.current = ws;
-
-		ws.on("ready", () => {
-			setDuration(ws.getDuration());
-		});
-
-		ws.on("timeupdate", (time) => {
-			setCurrentTime(time);
-		});
-
-		ws.on("play", () => {
-			setIsPlaying(true);
-		});
-
-		ws.on("pause", () => {
-			setIsPlaying(false);
-		});
-
-		ws.on("finish", () => {
-			setIsPlaying(false);
-			setCurrentTime(0);
-		});
 
 		return () => {
 			ws.destroy();
@@ -114,28 +95,71 @@ export default function TrackFeedItem({
 		const ws = waveSurferRef.current;
 		if (!ws) return;
 
-		if (!isActive && ws.isPlaying()) {
-			ws.pause();
-			setIsPlaying(false);
+		try {
+			if (isCurrentTrack && duration > 0) {
+				ws.seekTo(currentTime / duration);
+			} else {
+				ws.seekTo(0);
+			}
+		} catch {
+			// ignore until ready
 		}
-	}, [isActive]);
+	}, [isCurrentTrack, currentTime, duration]);
 
-	async function handleTogglePlay() {
-		const ws = waveSurferRef.current;
-		if (!ws) return;
+	useEffect(() => {
+	const ws = waveSurferRef.current;
+	if (!ws) return;
 
-		if (ws.isPlaying()) {
-			ws.pause();
+	const handleWaveClick = async (relativeX: number) => {
+		const clickedTime = ws.getDuration() * relativeX;
+
+		if (currentTrack?.id === track.id) {
+			seekTo(clickedTime);
 			return;
 		}
 
-		onPlayRequest(track.id);
-		await ws.play();
+		await playTrack({
+			id: track.id,
+			title: track.title,
+			fileUrl: track.fileUrl,
+			artistName,
+			trackType: track.trackType,
+		});
+
+		setTimeout(() => {
+			seekTo(clickedTime);
+		}, 150);
+	};
+
+	ws.on("click", handleWaveClick);
+
+	return () => {
+		ws.un("click", handleWaveClick);
+	};
+}, [
+	currentTrack?.id,
+	track.id,
+	track.title,
+	track.fileUrl,
+	track.trackType,
+	artistName,
+	playTrack,
+	seekTo,
+]);
+
+	async function handleTogglePlay() {
+		await playTrack({
+			id: track.id,
+			title: track.title,
+			fileUrl: track.fileUrl,
+			artistName,
+			trackType: track.trackType,
+		});
 	}
 
 	function handleProtectedAction(actionName: string) {
 		if (isGuest) {
-			window.location.href = "/login";
+			window.location.href = "/auth/login";
 			return;
 		}
 
@@ -205,14 +229,13 @@ export default function TrackFeedItem({
 		return `${years} year${years === 1 ? "" : "s"} ago`;
 	}
 
-	const progressPercent = useMemo(() => {
-		if (!duration) return 0;
-		return (currentTime / duration) * 100;
-	}, [currentTime, duration]);
+	const displayedCurrentTime = isCurrentTrack ? currentTime : 0;
+	const displayedDuration = isCurrentTrack ? duration : 0;
 
-	const [liked, setLiked] = useState(track.isLiked);
-	const [likesCount, setLikesCount] = useState(track.likesCount);
-	const [likeLoading, setLikeLoading] = useState(false);
+	const progressPercent = useMemo(() => {
+		if (!displayedDuration) return 0;
+		return (displayedCurrentTime / displayedDuration) * 100;
+	}, [displayedCurrentTime, displayedDuration]);
 
 	async function handleLike() {
 		if (isGuest) {
@@ -236,7 +259,7 @@ export default function TrackFeedItem({
 			}
 
 			setLiked(data.liked);
-			setLikesCount(data.likeCount);
+			setLikesCount(data.likesCount);
 		} catch (error) {
 			console.error("Error liking track:", error);
 		} finally {
@@ -266,7 +289,7 @@ export default function TrackFeedItem({
 							onClick={handleTogglePlay}
 							className="mt-1 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#6B4A30] text-[#FAF8ED] shadow-md transition hover:opacity-90"
 						>
-							{isPlaying ? (
+							{isThisTrackPlaying ? (
 								<Pause size={26} />
 							) : (
 								<Play size={26} className="ml-1" />
@@ -296,7 +319,7 @@ export default function TrackFeedItem({
 
 								<div className="mt-3 flex items-center gap-3">
 									<span className="w-12 text-xs text-[#4E3523]/70">
-										{formatTime(currentTime)}
+										{formatTime(displayedCurrentTime)}
 									</span>
 
 									<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#E7DED5]">
@@ -307,7 +330,7 @@ export default function TrackFeedItem({
 									</div>
 
 									<span className="w-12 text-right text-xs text-[#4E3523]/70">
-										{formatTime(duration)}
+										{formatTime(displayedDuration)}
 									</span>
 								</div>
 							</div>
