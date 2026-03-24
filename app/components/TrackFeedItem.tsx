@@ -25,6 +25,7 @@ type TrackFeedItemProps = {
 		createdAt?: string | Date | null;
 		likesCount: number;
 		isLiked: boolean;
+		commentCount: number;
 		owner?: {
 			name: string | null;
 			handle: string | null;
@@ -326,13 +327,13 @@ export default function TrackFeedItem({
 						{likesCount}
 					</button>
 
-					<button
-						onClick={() => handleProtectedAction("comment")}
+					<Link
+						href={`/main/song/${track.id}`}
 						className="flex items-center gap-2 rounded-full px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
 					>
 						<MessageCircle size={18} />
-						Comment
-					</button>
+						{track.commentCount ?? 0}
+					</Link>
 
 					<button
 						onClick={() => setIsShareOpen(true)}
