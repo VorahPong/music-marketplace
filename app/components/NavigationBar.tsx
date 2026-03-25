@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Menu, Search, Plus, Bell, LogOut, Settings, User, Coins } from "lucide-react";
+import {
+	Menu,
+	Search,
+	Plus,
+	Bell,
+	LogOut,
+	Settings,
+	User,
+	Coins,
+} from "lucide-react";
 import Sidebar from "./SideBar";
 import Link from "next/link";
 
@@ -18,8 +27,10 @@ type NavigationBarProps = {
 export default function NavigationBar({ user }: NavigationBarProps) {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 	const [isProfileOpen, setIsProfileOpen] = useState(false);
+	const [isPointsOpen, setIsPointsOpen] = useState(false);
 
 	const profileRef = useRef<HTMLDivElement | null>(null);
+	const pointsRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
 		function handleClickOutside(event: MouseEvent) {
@@ -28,6 +39,13 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 				!profileRef.current.contains(event.target as Node)
 			) {
 				setIsProfileOpen(false);
+			}
+
+			if (
+				pointsRef.current &&
+				!pointsRef.current.contains(event.target as Node)
+			) {
+				setIsPointsOpen(false);
 			}
 		}
 
@@ -82,9 +100,33 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 						</button>
 					</Link>
 
-					<div className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-3 py-2 text-sm font-medium text-[#4E3523]">
-						<Coins size={16} />
-						<span>{user?.points ?? 0} pts</span>
+					<div className="relative" ref={pointsRef}>
+						<button
+							onClick={() => {
+								if (!user) {
+									window.location.href = "/auth/login";
+									return;
+								}
+								setIsPointsOpen((prev) => !prev);
+							}}
+							className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-3 py-2 text-sm font-medium text-[#4E3523] hover:opacity-90"
+						>
+							<Coins size={16} />
+							<span>{user?.points ?? 0} pts</span>
+						</button>
+
+						{isPointsOpen && user && (
+							<div className="absolute right-0 top-12 z-50 w-52 rounded-2xl border border-[#E5DED6] bg-[#FAF8ED] p-2 shadow-xl">
+								<Link
+									href="/main/buy-points"
+									className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
+									onClick={() => setIsPointsOpen(false)}
+								>
+									<Coins size={16} />
+									Buy More Points
+								</Link>
+							</div>
+						)}
 					</div>
 
 					<button className="text-[#FAF8ED]">
