@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import CommentForm from "@/app/components/CommentForm";
+import TrackFeedItem from "@/app/components/TrackFeedItem";
 
 type SongPageProps = {
 	params: Promise<{
@@ -42,6 +43,12 @@ export default async function SongPage({ params }: SongPageProps) {
 					},
 				},
 			},
+			_count: {
+				select: {
+					likes: true,
+					comments: true,
+				},
+			},
 		},
 	});
 
@@ -49,52 +56,59 @@ export default async function SongPage({ params }: SongPageProps) {
 		notFound();
 	}
 
+	const existingLike = user
+		? await prisma.like.findUnique({
+				where: {
+					userId_trackId: {
+						userId: user.id,
+						trackId: track.id,
+					},
+				},
+		  })
+		: null;
+
+	const playerTrack = {
+		id: track.id,
+		title: track.title,
+		description: track.description,
+		fileUrl: track.fileUrl,
+		trackType: track.trackType,
+		createdAt: track.createdAt,
+		likesCount: track._count.likes,
+		isLiked: !!existingLike,
+		commentCount: track._count.comments,
+		owner: track.owner
+			? {
+					name: track.owner.name,
+					handle: track.owner.handle,
+			  }
+			: null,
+	};
+
 	return (
 		<div className="min-h-screen bg-[#FAF8ED] text-[#4E3523]">
 			<div className="px-6 py-10">
 				<div className="mx-auto max-w-5xl">
-					<div className="grid gap-8 md:grid-cols-[260px_1fr]">
-						<div className="rounded-3xl border border-[#D6CFC7] bg-white p-5 shadow-sm">
-							<div className="flex h-56 items-center justify-center rounded-2xl bg-[#EAD9C7] text-[#4E3523]">
-								<span className="text-sm font-medium">Cover Placeholder</span>
-							</div>
-						</div>
+					<div>
+						<TrackFeedItem track={playerTrack} isGuest={!user} />
 
-						<div className="rounded-3xl border border-[#D6CFC7] bg-white p-6 shadow-sm">
-							<p className="text-sm text-[#4E3523]/70">
-								{track.owner ? (
-									<Link
-										href={
-											track.owner.handle
-												? `/main/channel/${track.owner.handle}`
-												: "#"
-										}
-										className="hover:underline"
-									>
-										{track.owner.name || track.owner.email}
-									</Link>
-								) : (
-									"Unknown Artist"
-								)}
-							</p>
+						<div className="mt-8 rounded-3xl border border-[#D6CFC7] bg-white p-6 shadow-sm">
+							<div className="flex items-center justify-between gap-4">
+								<div>
+									<p className="text-sm text-[#4E3523]/70">Format</p>
+									<span className="mt-2 inline-block rounded-full bg-[#FAF8ED] px-3 py-1 text-xs font-medium text-[#4E3523]">
+										{track.fileType === "audio/mpeg"
+											? "MP3"
+											: track.fileType.includes("wav")
+												? "WAV"
+												: track.fileType}
+									</span>
+								</div>
 
-							<h1 className="mt-2 text-4xl font-bold">{track.title}</h1>
-
-							<div className="mt-4">
-								<span className="inline-block rounded-full bg-[#FAF8ED] px-3 py-1 text-xs font-medium text-[#4E3523]">
-									{track.fileType === "audio/mpeg"
-										? "MP3"
-										: track.fileType.includes("wav")
-											? "WAV"
-											: track.fileType}
-								</span>
-							</div>
-
-							<div className="mt-6">
-								<audio controls className="w-full">
-									<source src={track.fileUrl} />
-									Your browser does not support audio playback.
-								</audio>
+								<div className="text-right text-sm text-[#4E3523]/70">
+									<p>{track._count.likes} like{track._count.likes !== 1 ? "s" : ""}</p>
+									<p>{track._count.comments} comment{track._count.comments !== 1 ? "s" : ""}</p>
+								</div>
 							</div>
 
 							<div className="mt-8">
