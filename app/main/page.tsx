@@ -31,20 +31,32 @@ export default async function HomePage() {
 						select: { id: true },
 					}
 				: false,
+			purchases: user
+				? {
+						where: { userId: user.id },
+						select: { id: true },
+					}
+				: false,
 		},
 	});
 
-	const feedTracks = tracks.map((track : any) => ({
+	const feedTracks = tracks.map((track) => ({
 		id: track.id,
 		title: track.title,
 		description: track.description,
 		fileUrl: track.fileUrl,
 		trackType: track.trackType,
 		createdAt: track.createdAt,
-		owner: track.owner,
 		likesCount: track._count.likes,
-		isLiked: Array.isArray(track.likes) ? track.likes.length > 0 : false,
 		commentCount: track._count.comments,
+		isLiked: Array.isArray(track.likes) ? track.likes.length > 0 : false,
+		isForSale: track.isForSale,
+		priceInPoints: track.priceInPoints,
+		isOwned: Array.isArray(track.purchases)
+			? track.purchases.length > 0
+			: false,
+		isOwner: user?.id === track.ownerId,
+		owner: track.owner,
 	}));
 
 	return (

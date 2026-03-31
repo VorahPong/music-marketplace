@@ -15,6 +15,8 @@ type TrackFeedListProps = {
 		commentCount: number;
 		isForSale?: boolean;
 		priceInPoints?: number | null;
+		isOwned?: boolean;
+		isOwner?: boolean;
 		owner?: {
 			id: string;
 			name: string | null;

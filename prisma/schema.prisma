@@ -21,6 +21,7 @@ model User {
   sessions     Session[]
   comments     Comment[]
   likes        Like[]
+  purchases TrackPurchase[]
 }
 
 model Track {
@@ -40,6 +41,20 @@ model Track {
 
   comments      Comment[]
   likes         Like[]
+  purchases TrackPurchase[]
+}
+
+model TrackPurchase {
+  id        String   @id @default(cuid())
+  userId    String
+  trackId   String
+  pointsPaid Int
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trackId])
 }
 
 model Like {
