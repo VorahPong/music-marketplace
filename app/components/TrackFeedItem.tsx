@@ -25,6 +25,10 @@ type TrackFeedItemProps = {
 		likesCount: number;
 		isLiked: boolean;
 		commentCount: number;
+		isForSale?: boolean;
+		priceInPoints?: number | null;
+		isOwned?: boolean;
+		isOwner?: boolean;
 		owner?: {
 			name: string | null;
 			handle: string | null;
@@ -107,46 +111,46 @@ export default function TrackFeedItem({
 	}, [isCurrentTrack, currentTime, duration]);
 
 	useEffect(() => {
-	const ws = waveSurferRef.current;
-	if (!ws) return;
+		const ws = waveSurferRef.current;
+		if (!ws) return;
 
-	const handleWaveClick = async (relativeX: number) => {
-		const clickedTime = ws.getDuration() * relativeX;
+		const handleWaveClick = async (relativeX: number) => {
+			const clickedTime = ws.getDuration() * relativeX;
 
-		if (currentTrack?.id === track.id) {
-			seekTo(clickedTime);
-			return;
-		}
+			if (currentTrack?.id === track.id) {
+				seekTo(clickedTime);
+				return;
+			}
 
-		await playTrack({
-			id: track.id,
-			title: track.title,
-			fileUrl: track.fileUrl,
-			artistName,
-			trackType: track.trackType,
-			artistHandle: track.owner?.handle ?? null,
-		});
+			await playTrack({
+				id: track.id,
+				title: track.title,
+				fileUrl: track.fileUrl,
+				artistName,
+				trackType: track.trackType,
+				artistHandle: track.owner?.handle ?? null,
+			});
 
-		setTimeout(() => {
-			seekTo(clickedTime);
-		}, 150);
-	};
+			setTimeout(() => {
+				seekTo(clickedTime);
+			}, 150);
+		};
 
-	ws.on("click", handleWaveClick);
+		ws.on("click", handleWaveClick);
 
-	return () => {
-		ws.un("click", handleWaveClick);
-	};
-}, [
-	currentTrack?.id,
-	track.id,
-	track.title,
-	track.fileUrl,
-	track.trackType,
-	artistName,
-	playTrack,
-	seekTo,
-]);
+		return () => {
+			ws.un("click", handleWaveClick);
+		};
+	}, [
+		currentTrack?.id,
+		track.id,
+		track.title,
+		track.fileUrl,
+		track.trackType,
+		artistName,
+		playTrack,
+		seekTo,
+	]);
 
 	async function handleTogglePlay() {
 		await playTrack({
@@ -269,6 +273,45 @@ export default function TrackFeedItem({
 		}
 	}
 
+	const [buyLoading, setBuyLoading] = useState(false);
+	const [isOwned, setIsOwned] = useState(track.isOwned ?? false);
+
+	async function handleBuyTrack() {
+		if (isGuest) {
+			window.location.href = "/auth/login";
+			return;
+		}
+
+		if (buyLoading || isOwned) return;
+
+		setBuyLoading(true);
+
+		try {
+			const response = await fetch(`/api/tracks/${track.id}/buy`, {
+				method: "POST",
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				alert(data.error || "Failed to buy track.");
+				return;
+			}
+
+			setIsOwned(true);
+			alert("Track purchased successfully!");
+		} catch (error) {
+			console.error("Buy track error:", error);
+			alert("Something went wrong.");
+		} finally {
+			setBuyLoading(false);
+		}
+	}
+
+	function handleDownloadTrack() {
+		window.open(`/api/tracks/${track.id}/download`, "_blank");
+	}
+
 	return (
 		<>
 			<div className="relative rounded-3xl border border-[#D6CFC7] bg-white p-4 shadow-sm">
@@ -368,13 +411,34 @@ export default function TrackFeedItem({
 						Share
 					</button>
 
-					{track.trackType === "BEAT" ? (
-						<button
-							onClick={() => handleProtectedAction("buy")}
-							className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED]"
-						>
-							Buy (10 pts)
-						</button>
+					{track.isOwner ? (
+						<div className="rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523]">
+							Your Track
+						</div>
+					) : track.isForSale ? (
+						<div className="flex items-center gap-2">
+							{isOwned ? (
+								<>
+									<div className="rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523]">
+										Owned
+									</div>
+									<button
+										onClick={handleDownloadTrack}
+										className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED]"
+									>
+										Download
+									</button>
+								</>
+							) : (
+								<button
+									onClick={handleBuyTrack}
+									disabled={buyLoading}
+									className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED] disabled:opacity-60"
+								>
+									{buyLoading ? "Buying..." : `Buy (${track.priceInPoints ?? 0} pts)`}
+								</button>
+							)}
+						</div>
 					) : (
 						<button
 							onClick={() => handleProtectedAction("support")}
