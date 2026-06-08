@@ -13,7 +13,7 @@ model User {
   handle       String    @unique
   email        String    @unique
   passwordHash String
-  points       Int       @default(0)
+  role         UserRole  @default(CUSTOMER)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -21,7 +21,7 @@ model User {
   sessions     Session[]
   comments     Comment[]
   likes        Like[]
-  purchases TrackPurchase[]
+  purchases    TrackPurchase[]
 }
 
 model Track {
@@ -32,7 +32,7 @@ model Track {
   fileType      String
   trackType     TrackType @default(SONG)
   isForSale     Boolean   @default(false)
-  priceInPoints Int?
+  priceUsd      Decimal?  @db.Decimal(10, 2)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -41,14 +41,14 @@ model Track {
 
   comments      Comment[]
   likes         Like[]
-  purchases TrackPurchase[]
+  purchases     TrackPurchase[]
 }
 
 model TrackPurchase {
   id        String   @id @default(cuid())
   userId    String
   trackId   String
-  pointsPaid Int
+  amountUsd Decimal  @db.Decimal(10, 2)
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -97,4 +97,9 @@ enum TrackType {
   BEAT
   LOOP
   DRUMKIT
+}
+
+enum UserRole {
+  CUSTOMER
+  SELLER
 }
