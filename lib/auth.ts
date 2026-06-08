@@ -13,6 +13,7 @@ export async function getCurrentUser() {
 		where: { token: sessionToken },
 		include: {
 			user: true,
+			role: 'SELLER',
 		},
 	});
 

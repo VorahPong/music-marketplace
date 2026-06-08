@@ -28,13 +28,19 @@ model Track {
   id            String    @id @default(cuid())
   title         String
   description   String?
-  fileUrl       String
-  fileType      String
-  trackType     TrackType @default(SONG)
-  isForSale     Boolean   @default(false)
-  priceUsd      Decimal?  @db.Decimal(10, 2)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  previewMp3Url     String
+  previewFileType   String?
+  regularWavKey     String?
+  fullZipKey        String?
+  trackType         TrackType @default(SONG)
+  bpm               Int?
+  timeSignature     String?
+  musicalKey        String?
+  isForSale         Boolean   @default(false)
+  regularPriceCents Int?
+  fullPriceCents    Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   ownerId       String?
   owner         User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -48,13 +54,14 @@ model TrackPurchase {
   id        String   @id @default(cuid())
   userId    String
   trackId   String
-  amountUsd Decimal  @db.Decimal(10, 2)
+  version     PurchaseVersion @default(REGULAR)
+  amountCents Int
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, trackId])
+  @@unique([userId, trackId, version])
 }
 
 model Like {
@@ -102,4 +109,9 @@ enum TrackType {
 enum UserRole {
   CUSTOMER
   SELLER
+}
+
+enum PurchaseVersion {
+  REGULAR
+  FULL
 }
