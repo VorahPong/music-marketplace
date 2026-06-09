@@ -323,34 +323,37 @@ export default function TrackFeedItem({
 		setBuyLoadingVersion(version);
 
 		try {
-			const response = await fetch(`/api/tracks/${track.id}/buy`, {
+			const response = await fetch("/api/paypal/create-order", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({ version }),
+				body: JSON.stringify({
+					trackId: track.id,
+					version,
+				}),
 			});
 
 			const data = await response.json();
 
 			if (!response.ok) {
-				alert(data.error || "Failed to buy track.");
+				alert(data.error || "Failed to create PayPal order.");
 				return;
 			}
 
-			if (version === "REGULAR") {
-				setRegularOwned(true);
+			const approveLink = data.links?.find(
+				(link: { rel: string; href: string }) => link.rel === "approve",
+			)?.href;
+
+			if (!approveLink) {
+				alert("PayPal approval link was not returned.");
+				return;
 			}
 
-			if (version === "FULL") {
-				setFullOwned(true);
-				setRegularOwned(true);
-			}
-
-			alert(`${version === "FULL" ? "Full" : "Regular"} version purchased successfully!`);
+			window.location.href = approveLink;
 		} catch (error) {
-			console.error("Buy track error:", error);
-			alert("Something went wrong.");
+			console.error("PayPal create order error:", error);
+			alert("Something went wrong while opening PayPal.");
 		} finally {
 			setBuyLoadingVersion(null);
 		}
