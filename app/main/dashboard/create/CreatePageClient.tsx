@@ -14,27 +14,63 @@ export default function CreatePageClient() {
 	const [description, setDescription] = useState("");
 	const [trackType, setTrackType] =
 		useState<(typeof TRACK_TYPES)[number]>("SONG");
+	const [bpm, setBpm] = useState("");
+	const [timeSignature, setTimeSignature] = useState("4/4");
+	const [musicalKey, setMusicalKey] = useState("");
 	const [isForSale, setIsForSale] = useState(false);
-	const [priceInPoints, setPriceInPoints] = useState("");
-	const [file, setFile] = useState<File | null>(null);
+	const [regularPriceUsd, setRegularPriceUsd] = useState("");
+	const [fullPriceUsd, setFullPriceUsd] = useState("");
+	const [previewMp3File, setPreviewMp3File] = useState<File | null>(null);
+	const [regularWavFile, setRegularWavFile] = useState<File | null>(null);
+	const [fullZipFile, setFullZipFile] = useState<File | null>(null);
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [uploadedUrl, setUploadedUrl] = useState("");
 
-	function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+	function handlePreviewMp3Change(e: React.ChangeEvent<HTMLInputElement>) {
 		const selected = e.target.files?.[0];
 		if (!selected) return;
 
-		const validTypes = ["audio/mpeg", "audio/wav", "audio/x-wav"];
-
-		if (!validTypes.includes(selected.type)) {
-			setError("Only MP3 or WAV files are allowed.");
-			setFile(null);
+		if (selected.type !== "audio/mpeg" && !selected.name.toLowerCase().endsWith(".mp3")) {
+			setError("Preview file must be an MP3.");
+			setPreviewMp3File(null);
 			return;
 		}
 
-		setFile(selected);
+		setPreviewMp3File(selected);
+		setError("");
+	}
+
+	function handleRegularWavChange(e: React.ChangeEvent<HTMLInputElement>) {
+		const selected = e.target.files?.[0];
+		if (!selected) return;
+
+		const isWav = ["audio/wav", "audio/x-wav", "audio/wave"].includes(selected.type) || selected.name.toLowerCase().endsWith(".wav");
+
+		if (!isWav) {
+			setError("Regular version must be a WAV file.");
+			setRegularWavFile(null);
+			return;
+		}
+
+		setRegularWavFile(selected);
+		setError("");
+	}
+
+	function handleFullZipChange(e: React.ChangeEvent<HTMLInputElement>) {
+		const selected = e.target.files?.[0];
+		if (!selected) return;
+
+		const isZip = selected.type === "application/zip" || selected.type === "application/x-zip-compressed" || selected.name.toLowerCase().endsWith(".zip");
+
+		if (!isZip) {
+			setError("Full version must be a ZIP file.");
+			setFullZipFile(null);
+			return;
+		}
+
+		setFullZipFile(selected);
 		setError("");
 	}
 
@@ -44,20 +80,36 @@ export default function CreatePageClient() {
 		setSuccess("");
 		setUploadedUrl("");
 
-		if (!title.trim() || !file) {
-			setError("Title and audio file are required.");
+		if (!title.trim() || !previewMp3File) {
+			setError("Title and preview MP3 are required.");
 			return;
 		}
 
-		if (isForSale) {
-			const numericPrice = Number(priceInPoints);
+		if (bpm.trim()) {
+			const numericBpm = Number(bpm);
 
-			if (
-				!priceInPoints.trim() ||
-				Number.isNaN(numericPrice) ||
-				numericPrice <= 0
-			) {
-				setError("Please enter a valid point price.");
+			if (Number.isNaN(numericBpm) || numericBpm <= 0) {
+				setError("Please enter a valid BPM.");
+				return;
+			}
+		}
+
+		if (isForSale) {
+			const regularPrice = Number(regularPriceUsd);
+			const fullPrice = Number(fullPriceUsd);
+
+			if (!regularWavFile) {
+				setError("Please upload a WAV file for the regular version.");
+				return;
+			}
+
+			if (!regularPriceUsd.trim() || Number.isNaN(regularPrice) || regularPrice <= 0) {
+				setError("Please enter a valid regular price in USD.");
+				return;
+			}
+
+			if (fullZipFile && (!fullPriceUsd.trim() || Number.isNaN(fullPrice) || fullPrice <= 0)) {
+				setError("Please enter a valid full version price in USD.");
 				return;
 			}
 		}
@@ -69,9 +121,21 @@ export default function CreatePageClient() {
 			formData.append("title", title);
 			formData.append("description", description);
 			formData.append("trackType", trackType);
+			formData.append("bpm", bpm);
+			formData.append("timeSignature", timeSignature);
+			formData.append("musicalKey", musicalKey);
 			formData.append("isForSale", String(isForSale));
-			formData.append("priceInPoints", isForSale ? priceInPoints : "");
-			formData.append("file", file);
+			formData.append("regularPriceUsd", isForSale ? regularPriceUsd : "");
+			formData.append("fullPriceUsd", isForSale && fullZipFile ? fullPriceUsd : "");
+			formData.append("previewMp3File", previewMp3File);
+
+			if (isForSale && regularWavFile) {
+				formData.append("regularWavFile", regularWavFile);
+			}
+
+			if (isForSale && fullZipFile) {
+				formData.append("fullZipFile", fullZipFile);
+			}
 
 			const res = await fetch("/api/upload", {
 				method: "POST",
@@ -90,9 +154,15 @@ export default function CreatePageClient() {
 			setTitle("");
 			setDescription("");
 			setTrackType("SONG");
+			setBpm("");
+			setTimeSignature("4/4");
+			setMusicalKey("");
 			setIsForSale(false);
-			setPriceInPoints("");
-			setFile(null);
+			setRegularPriceUsd("");
+			setFullPriceUsd("");
+			setPreviewMp3File(null);
+			setRegularWavFile(null);
+			setFullZipFile(null);
 		} catch (error) {
 			console.error(error);
 			setError("Upload failed. Please try again.");
@@ -106,7 +176,8 @@ export default function CreatePageClient() {
 			<div className="mx-auto mt-10 max-w-2xl">
 				<h1 className="text-2xl font-bold">Upload Audio</h1>
 				<p className="mt-2 text-[#4E3523]/70">
-					Upload your music, beat, loop, sample, or other audio file.
+					Upload a fast MP3 preview for customers to stream. Add a protected WAV
+					for the regular version and an optional ZIP for the full version.
 				</p>
 
 				<form
@@ -177,40 +248,177 @@ export default function CreatePageClient() {
 						</div>
 					</div>
 
+					<div className="grid gap-5 md:grid-cols-3">
+						<div>
+							<label className="mb-1 block text-sm font-medium">BPM</label>
+							<input
+								type="number"
+								min="1"
+								value={bpm}
+								onChange={(e) => setBpm(e.target.value)}
+								placeholder="140"
+								className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
+							/>
+						</div>
+
+						<div>
+							<label className="mb-1 block text-sm font-medium">
+								Time Signature
+							</label>
+							<select
+								value={timeSignature}
+								onChange={(e) => setTimeSignature(e.target.value)}
+								className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
+							>
+								<option value="4/4">4/4</option>
+								<option value="3/4">3/4</option>
+								<option value="6/8">6/8</option>
+								<option value="2/4">2/4</option>
+								<option value="5/4">5/4</option>
+								<option value="7/8">7/8</option>
+							</select>
+						</div>
+
+						<div>
+							<label className="mb-1 block text-sm font-medium">Key</label>
+							<select
+								value={musicalKey}
+								onChange={(e) => setMusicalKey(e.target.value)}
+								className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
+							>
+								<option value="">Select key</option>
+								<option value="C Major">C Major</option>
+								<option value="C Minor">C Minor</option>
+								<option value="C# Major">C# Major</option>
+								<option value="C# Minor">C# Minor</option>
+								<option value="D Major">D Major</option>
+								<option value="D Minor">D Minor</option>
+								<option value="D# Minor">D# Minor</option>
+								<option value="Eb Major">Eb Major</option>
+								<option value="E Major">E Major</option>
+								<option value="E Minor">E Minor</option>
+								<option value="F Major">F Major</option>
+								<option value="F Minor">F Minor</option>
+								<option value="F# Major">F# Major</option>
+								<option value="F# Minor">F# Minor</option>
+								<option value="G Major">G Major</option>
+								<option value="G Minor">G Minor</option>
+								<option value="G# Minor">G# Minor</option>
+								<option value="Ab Major">Ab Major</option>
+								<option value="A Major">A Major</option>
+								<option value="A Minor">A Minor</option>
+								<option value="A# Minor">A# Minor</option>
+								<option value="Bb Major">Bb Major</option>
+								<option value="B Major">B Major</option>
+								<option value="B Minor">B Minor</option>
+							</select>
+						</div>
+					</div>
+
 					{isForSale && (
 						<div>
 							<label className="mb-1 block text-sm font-medium">
-								Price in Points
+								Regular Price (USD)
 							</label>
 							<input
 								type="number"
 								min="1"
-								value={priceInPoints}
-								onChange={(e) => setPriceInPoints(e.target.value)}
-								placeholder="10"
+								step="0.01"
+								value={regularPriceUsd}
+								onChange={(e) => setRegularPriceUsd(e.target.value)}
+								placeholder="29.99"
 								className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
 							/>
 							<p className="mt-1 text-xs text-[#4E3523]/60">
-								Users will need this many points to buy this item.
+								Customers who buy the regular version will get access to the WAV file.
 							</p>
+
+							<div className="mt-4">
+								<label className="mb-1 block text-sm font-medium">
+									Full Version Price (USD)
+								</label>
+								<input
+									type="number"
+									min="1"
+									step="0.01"
+									value={fullPriceUsd}
+									onChange={(e) => setFullPriceUsd(e.target.value)}
+									placeholder="79.99"
+									className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
+								/>
+								<p className="mt-1 text-xs text-[#4E3523]/60">
+									Optional. Customers who buy the full version will get access to the ZIP file.
+								</p>
+							</div>
 						</div>
 					)}
 
-					<div>
-						<label className="mb-1 block text-sm font-medium">
-							Audio File (.mp3 / .wav)
-						</label>
-						<input
-							type="file"
-							accept=".mp3,.wav"
-							onChange={handleFileChange}
-							className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm"
-						/>
-
-						{file && (
-							<p className="mt-2 text-sm text-[#4E3523]/70">
-								Selected: {file.name}
+					<div className="space-y-4">
+						<div>
+							<label className="mb-1 block text-sm font-medium">
+								Preview MP3 (.mp3)
+							</label>
+							<input
+								type="file"
+								accept=".mp3,audio/mpeg"
+								onChange={handlePreviewMp3Change}
+								className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm"
+							/>
+							<p className="mt-1 text-xs text-[#4E3523]/60">
+								Public streaming preview. This should be optimized for fast playback.
 							</p>
+
+							{previewMp3File && (
+								<p className="mt-2 text-sm text-[#4E3523]/70">
+									Selected: {previewMp3File.name}
+								</p>
+							)}
+						</div>
+
+						{isForSale && (
+							<>
+								<div>
+									<label className="mb-1 block text-sm font-medium">
+										Regular Version WAV (.wav)
+									</label>
+									<input
+										type="file"
+										accept=".wav,audio/wav,audio/x-wav"
+										onChange={handleRegularWavChange}
+										className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm"
+									/>
+									<p className="mt-1 text-xs text-[#4E3523]/60">
+										Protected download after regular purchase.
+									</p>
+
+									{regularWavFile && (
+										<p className="mt-2 text-sm text-[#4E3523]/70">
+											Selected: {regularWavFile.name}
+										</p>
+									)}
+								</div>
+
+								<div>
+									<label className="mb-1 block text-sm font-medium">
+										Full Version ZIP (.zip)
+									</label>
+									<input
+										type="file"
+										accept=".zip,application/zip"
+										onChange={handleFullZipChange}
+										className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm"
+									/>
+									<p className="mt-1 text-xs text-[#4E3523]/60">
+										Optional protected download after full purchase. Use this for stems, license files, or project files.
+									</p>
+
+									{fullZipFile && (
+										<p className="mt-2 text-sm text-[#4E3523]/70">
+											Selected: {fullZipFile.name}
+										</p>
+									)}
+								</div>
+							</>
 						)}
 					</div>
 

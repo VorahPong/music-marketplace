@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getPayPalAccessToken, getPointPackage } from "@/lib/paypal";
+import { getPayPalAccessToken } from "@/lib/paypal";
 
 const PAYPAL_BASE_URL =
 	process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com";
+
+type PayPalCustomId = {
+	userId: string;
+	trackId: string;
+	version: "REGULAR" | "FULL";
+	amountCents: number;
+};
 
 export async function POST(req: Request) {
 	try {
@@ -16,20 +23,10 @@ export async function POST(req: Request) {
 
 		const body = await req.json();
 		const orderId = body.orderId as string | undefined;
-		const packageId = body.packageId as string | undefined;
 
-		if (!orderId || !packageId) {
+		if (!orderId) {
 			return NextResponse.json(
-				{ error: "Order ID and package ID are required." },
-				{ status: 400 },
-			);
-		}
-
-		const selectedPackage = getPointPackage(packageId);
-
-		if (!selectedPackage) {
-			return NextResponse.json(
-				{ error: "Invalid package selected." },
+				{ error: "Order ID is required." },
 				{ status: 400 },
 			);
 		}
@@ -64,18 +61,115 @@ export async function POST(req: Request) {
 			);
 		}
 
-		await prisma.user.update({
-			where: { id: user.id },
-			data: {
-				points: {
-					increment: selectedPackage.points,
+		const customIdRaw = data.purchase_units?.[0]?.payments?.captures?.[0]?.custom_id;
+
+		if (!customIdRaw) {
+			return NextResponse.json(
+				{ error: "Missing PayPal order metadata." },
+				{ status: 400 },
+			);
+		}
+
+		let customId: PayPalCustomId;
+
+		try {
+			customId = JSON.parse(customIdRaw) as PayPalCustomId;
+		} catch {
+			return NextResponse.json(
+				{ error: "Invalid PayPal order metadata." },
+				{ status: 400 },
+			);
+		}
+
+		if (customId.userId !== user.id) {
+			return NextResponse.json(
+				{ error: "This PayPal order does not belong to the current user." },
+				{ status: 403 },
+			);
+		}
+
+		if (customId.version !== "REGULAR" && customId.version !== "FULL") {
+			return NextResponse.json(
+				{ error: "Invalid purchase version." },
+				{ status: 400 },
+			);
+		}
+
+		const track = await prisma.track.findUnique({
+			where: { id: customId.trackId },
+			select: {
+				id: true,
+				isForSale: true,
+				ownerId: true,
+				regularWavKey: true,
+				fullZipKey: true,
+				regularPriceCents: true,
+				fullPriceCents: true,
+			},
+		});
+
+		if (!track) {
+			return NextResponse.json(
+				{ error: "Track not found." },
+				{ status: 404 },
+			);
+		}
+
+		if (track.ownerId === user.id) {
+			return NextResponse.json(
+				{ error: "You cannot buy your own track." },
+				{ status: 400 },
+			);
+		}
+
+		if (!track.isForSale) {
+			return NextResponse.json(
+				{ error: "This track is not for sale." },
+				{ status: 400 },
+			);
+		}
+
+		const expectedPriceCents =
+			customId.version === "REGULAR"
+				? track.regularPriceCents
+				: track.fullPriceCents;
+		const downloadKey =
+			customId.version === "REGULAR" ? track.regularWavKey : track.fullZipKey;
+
+		if (!downloadKey || !expectedPriceCents || expectedPriceCents <= 0) {
+			return NextResponse.json(
+				{ error: `${customId.version === "REGULAR" ? "Regular" : "Full"} version is not available.` },
+				{ status: 400 },
+			);
+		}
+
+		if (customId.amountCents !== expectedPriceCents) {
+			return NextResponse.json(
+				{ error: "PayPal order amount does not match the current track price." },
+				{ status: 400 },
+			);
+		}
+
+		const purchase = await prisma.trackPurchase.upsert({
+			where: {
+				userId_trackId_version: {
+					userId: user.id,
+					trackId: track.id,
+					version: customId.version,
 				},
+			},
+			update: {},
+			create: {
+				userId: user.id,
+				trackId: track.id,
+				version: customId.version,
+				amountCents: expectedPriceCents,
 			},
 		});
 
 		return NextResponse.json({
 			success: true,
-			pointsAdded: selectedPackage.points,
+			purchase,
 		});
 	} catch (error) {
 		console.error("Capture order route error:", error);

@@ -73,6 +73,7 @@ export async function POST(req: Request) {
 				handle,
 				email,
 				passwordHash,
+				role: "CUSTOMER",
 			},
 			select: {
 				id: true,

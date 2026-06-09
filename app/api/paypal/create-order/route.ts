@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { getPayPalAccessToken, getPointPackage } from "@/lib/paypal";
+import { prisma } from "@/lib/prisma";
+import { getPayPalAccessToken } from "@/lib/paypal";
 
 const PAYPAL_BASE_URL =
 	process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com";
@@ -14,23 +15,90 @@ export async function POST(req: Request) {
 		}
 
 		const body = await req.json();
-		const packageId = body.packageId as string | undefined;
+		const trackId = body.trackId as string | undefined;
+		const version = body.version as "REGULAR" | "FULL" | undefined;
 
-		if (!packageId) {
+		if (!trackId) {
 			return NextResponse.json(
-				{ error: "Package is required." },
+				{ error: "Track is required." },
 				{ status: 400 },
 			);
 		}
 
-		const selectedPackage = getPointPackage(packageId);
-
-		if (!selectedPackage) {
+		if (version !== "REGULAR" && version !== "FULL") {
 			return NextResponse.json(
-				{ error: "Invalid package selected." },
+				{ error: "Invalid purchase version." },
 				{ status: 400 },
 			);
 		}
+
+		const track = await prisma.track.findUnique({
+			where: { id: trackId },
+			select: {
+				id: true,
+				title: true,
+				isForSale: true,
+				ownerId: true,
+				regularWavKey: true,
+				fullZipKey: true,
+				regularPriceCents: true,
+				fullPriceCents: true,
+			},
+		});
+
+		if (!track) {
+			return NextResponse.json(
+				{ error: "Track not found." },
+				{ status: 404 },
+			);
+		}
+
+		if (track.ownerId === user.id) {
+			return NextResponse.json(
+				{ error: "You cannot buy your own track." },
+				{ status: 400 },
+			);
+		}
+
+		if (!track.isForSale) {
+			return NextResponse.json(
+				{ error: "This track is not for sale." },
+				{ status: 400 },
+			);
+		}
+
+		const priceCents =
+			version === "REGULAR" ? track.regularPriceCents : track.fullPriceCents;
+		const downloadKey =
+			version === "REGULAR" ? track.regularWavKey : track.fullZipKey;
+
+		if (!downloadKey || !priceCents || priceCents <= 0) {
+			return NextResponse.json(
+				{ error: `${version === "REGULAR" ? "Regular" : "Full"} version is not available.` },
+				{ status: 400 },
+			);
+		}
+
+		const existingPurchase = await prisma.trackPurchase.findUnique({
+			where: {
+				userId_trackId_version: {
+					userId: user.id,
+					trackId: track.id,
+					version,
+				},
+			},
+			select: { id: true },
+		});
+
+		if (existingPurchase) {
+			return NextResponse.json(
+				{ error: "You already own this version." },
+				{ status: 400 },
+			);
+		}
+
+		const priceUsd = (priceCents / 100).toFixed(2);
+		const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 		const accessToken = await getPayPalAccessToken();
 
@@ -42,17 +110,24 @@ export async function POST(req: Request) {
 			},
 			body: JSON.stringify({
 				intent: "CAPTURE",
+				application_context: {
+					return_url: `${appUrl}/main/payment/success`,
+					cancel_url: `${appUrl}/main/payment/cancel`,
+					brand_name: "Music Marketplace",
+					user_action: "PAY_NOW",
+				},
 				purchase_units: [
 					{
 						amount: {
 							currency_code: "USD",
-							value: selectedPackage.price,
+							value: priceUsd,
 						},
-						description: `${selectedPackage.name} - ${selectedPackage.points} points`,
+						description: `${track.title} - ${version === "REGULAR" ? "Regular WAV" : "Full ZIP"}`,
 						custom_id: JSON.stringify({
 							userId: user.id,
-							packageId,
-							points: selectedPackage.points,
+							trackId: track.id,
+							version,
+							amountCents: priceCents,
 						}),
 					},
 				],
@@ -69,7 +144,10 @@ export async function POST(req: Request) {
 			);
 		}
 
-		return NextResponse.json({ orderId: data.id });
+		return NextResponse.json({
+			orderId: data.id,
+			links: data.links,
+		});
 	} catch (error) {
 		console.error("Create order route error:", error);
 		return NextResponse.json(

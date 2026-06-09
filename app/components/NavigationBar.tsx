@@ -20,6 +20,7 @@ type NavigationBarProps = {
 		name: string | null;
 		email: string;
 		handle: string;
+		role: string;
 		points: number;
 	} | null;
 };
@@ -27,7 +28,6 @@ type NavigationBarProps = {
 export default function NavigationBar({ user }: NavigationBarProps) {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 	const [isProfileOpen, setIsProfileOpen] = useState(false);
-	const [isPointsOpen, setIsPointsOpen] = useState(false);
 
 	const profileRef = useRef<HTMLDivElement | null>(null);
 	const pointsRef = useRef<HTMLDivElement | null>(null);
@@ -39,13 +39,6 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 				!profileRef.current.contains(event.target as Node)
 			) {
 				setIsProfileOpen(false);
-			}
-
-			if (
-				pointsRef.current &&
-				!pointsRef.current.contains(event.target as Node)
-			) {
-				setIsPointsOpen(false);
 			}
 		}
 
@@ -93,41 +86,14 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 				</div>
 
 				<div className="flex items-center gap-4">
-					<Link href="/main/dashboard/create">
-						<button className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523] hover:opacity-90">
-							<Plus size={16} />
-							Create
-						</button>
-					</Link>
-
-					<div className="relative" ref={pointsRef}>
-						<button
-							onClick={() => {
-								if (!user) {
-									window.location.href = "/auth/login";
-									return;
-								}
-								setIsPointsOpen((prev) => !prev);
-							}}
-							className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-3 py-2 text-sm font-medium text-[#4E3523] hover:opacity-90"
-						>
-							<Coins size={16} />
-							<span>{user?.points ?? 0} pts</span>
-						</button>
-
-						{isPointsOpen && user && (
-							<div className="absolute right-0 top-12 z-50 w-52 rounded-2xl border border-[#E5DED6] bg-[#FAF8ED] p-2 shadow-xl">
-								<Link
-									href="/main/buy-points"
-									className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
-									onClick={() => setIsPointsOpen(false)}
-								>
-									<Coins size={16} />
-									Buy More Points
-								</Link>
-							</div>
-						)}
-					</div>
+					{user?.role === "SELLER" && (
+						<Link href="/main/dashboard/create">
+							<button className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523] hover:opacity-90">
+								<Plus size={16} />
+								Create
+							</button>
+						</Link>
+					)}
 
 					<button className="text-[#FAF8ED]">
 						<Bell size={20} />

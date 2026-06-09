@@ -13,7 +13,7 @@ model User {
   handle       String    @unique
   email        String    @unique
   passwordHash String
-  points       Int       @default(0)
+  role         UserRole  @default(CUSTOMER)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -21,40 +21,47 @@ model User {
   sessions     Session[]
   comments     Comment[]
   likes        Like[]
-  purchases TrackPurchase[]
+  purchases    TrackPurchase[]
 }
 
 model Track {
   id            String    @id @default(cuid())
   title         String
   description   String?
-  fileUrl       String
-  fileType      String
-  trackType     TrackType @default(SONG)
-  isForSale     Boolean   @default(false)
-  priceInPoints Int?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  previewMp3Url     String
+  previewFileType   String?
+  regularWavKey     String?
+  fullZipKey        String?
+  trackType         TrackType @default(SONG)
+  bpm               Int?
+  timeSignature     String?
+  musicalKey        String?
+  isForSale         Boolean   @default(false)
+  regularPriceCents Int?
+  fullPriceCents    Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   ownerId       String?
   owner         User?     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   comments      Comment[]
   likes         Like[]
-  purchases TrackPurchase[]
+  purchases     TrackPurchase[]
 }
 
 model TrackPurchase {
   id        String   @id @default(cuid())
   userId    String
   trackId   String
-  pointsPaid Int
+  version     PurchaseVersion @default(REGULAR)
+  amountCents Int
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, trackId])
+  @@unique([userId, trackId, version])
 }
 
 model Like {
@@ -97,4 +104,14 @@ enum TrackType {
   BEAT
   LOOP
   DRUMKIT
+}
+
+enum UserRole {
+  CUSTOMER
+  SELLER
+}
+
+enum PurchaseVersion {
+  REGULAR
+  FULL
 }
