@@ -7,6 +7,8 @@ import {
 	Play,
 	Pause,
 	Share2,
+	Download,
+	ShoppingCart,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -19,14 +21,23 @@ type TrackFeedItemProps = {
 		id: string;
 		title: string;
 		description: string | null;
-		fileUrl: string;
+		previewMp3Url: string;
+		previewFileType?: string | null;
+		regularWavKey?: string | null;
+		fullZipKey?: string | null;
 		trackType?: string | null;
+		bpm?: number | null;
+		timeSignature?: string | null;
+		musicalKey?: string | null;
 		createdAt?: string | Date | null;
 		likesCount: number;
 		isLiked: boolean;
 		commentCount: number;
 		isForSale?: boolean;
-		priceInPoints?: number | null;
+		regularPriceCents?: number | null;
+		fullPriceCents?: number | null;
+		isRegularOwned?: boolean;
+		isFullOwned?: boolean;
 		isOwned?: boolean;
 		isOwner?: boolean;
 		owner?: {
@@ -56,9 +67,20 @@ export default function TrackFeedItem({
 
 	const artistName = track.owner?.name || "Unknown Artist";
 
+	const previewUrl = track.previewMp3Url;
+	const isRegularOwned = track.isRegularOwned ?? track.isOwned ?? false;
+	const isFullOwned = track.isFullOwned ?? false;
+	const hasFullVersion = Boolean(track.fullZipKey && track.fullPriceCents);
+
 	const displayTrackType = track.trackType
 		? `#${track.trackType.charAt(0)}${track.trackType.slice(1).toLowerCase()}`
 		: "#Song";
+
+	const metadataItems = [
+		track.bpm ? `${track.bpm} BPM` : null,
+		track.musicalKey || null,
+		track.timeSignature || null,
+	].filter(Boolean);
 
 	const displayRelativeTime = formatRelativeTime(track.createdAt);
 
@@ -70,12 +92,21 @@ export default function TrackFeedItem({
 	const isCurrentTrack = currentTrack?.id === track.id;
 	const isThisTrackPlaying = isCurrentTrack && isPlaying;
 
+	function formatUsd(priceCents?: number | null) {
+		if (!priceCents) return "$0.00";
+
+		return new Intl.NumberFormat("en-US", {
+			style: "currency",
+			currency: "USD",
+		}).format(priceCents / 100);
+	}
+
 	useEffect(() => {
 		if (!waveContainerRef.current) return;
 
 		const ws = WaveSurfer.create({
 			container: waveContainerRef.current,
-			url: track.fileUrl,
+			url: previewUrl,
 			height: 72,
 			barWidth: 2,
 			barGap: 1,
@@ -93,7 +124,7 @@ export default function TrackFeedItem({
 			ws.destroy();
 			waveSurferRef.current = null;
 		};
-	}, [track.fileUrl]);
+	}, [previewUrl]);
 
 	useEffect(() => {
 		const ws = waveSurferRef.current;
@@ -125,7 +156,7 @@ export default function TrackFeedItem({
 			await playTrack({
 				id: track.id,
 				title: track.title,
-				fileUrl: track.fileUrl,
+				fileUrl: previewUrl,
 				artistName,
 				trackType: track.trackType,
 				artistHandle: track.owner?.handle ?? null,
@@ -145,7 +176,7 @@ export default function TrackFeedItem({
 		currentTrack?.id,
 		track.id,
 		track.title,
-		track.fileUrl,
+		previewUrl,
 		track.trackType,
 		artistName,
 		playTrack,
@@ -156,7 +187,7 @@ export default function TrackFeedItem({
 		await playTrack({
 			id: track.id,
 			title: track.title,
-			fileUrl: track.fileUrl,
+			fileUrl: previewUrl,
 			artistName,
 			trackType: track.trackType,
 			artistHandle: track.owner?.handle ?? null,
@@ -273,22 +304,31 @@ export default function TrackFeedItem({
 		}
 	}
 
-	const [buyLoading, setBuyLoading] = useState(false);
-	const [isOwned, setIsOwned] = useState(track.isOwned ?? false);
+	const [buyLoadingVersion, setBuyLoadingVersion] = useState<
+		"REGULAR" | "FULL" | null
+	>(null);
+	const [regularOwned, setRegularOwned] = useState(isRegularOwned);
+	const [fullOwned, setFullOwned] = useState(isFullOwned);
 
-	async function handleBuyTrack() {
+	async function handleBuyTrack(version: "REGULAR" | "FULL") {
 		if (isGuest) {
 			window.location.href = "/auth/login";
 			return;
 		}
 
-		if (buyLoading || isOwned) return;
+		if (buyLoadingVersion) return;
+		if (version === "REGULAR" && regularOwned) return;
+		if (version === "FULL" && fullOwned) return;
 
-		setBuyLoading(true);
+		setBuyLoadingVersion(version);
 
 		try {
 			const response = await fetch(`/api/tracks/${track.id}/buy`, {
 				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ version }),
 			});
 
 			const data = await response.json();
@@ -298,18 +338,26 @@ export default function TrackFeedItem({
 				return;
 			}
 
-			setIsOwned(true);
-			alert("Track purchased successfully!");
+			if (version === "REGULAR") {
+				setRegularOwned(true);
+			}
+
+			if (version === "FULL") {
+				setFullOwned(true);
+				setRegularOwned(true);
+			}
+
+			alert(`${version === "FULL" ? "Full" : "Regular"} version purchased successfully!`);
 		} catch (error) {
 			console.error("Buy track error:", error);
 			alert("Something went wrong.");
 		} finally {
-			setBuyLoading(false);
+			setBuyLoadingVersion(null);
 		}
 	}
 
-	function handleDownloadTrack() {
-		window.open(`/api/tracks/${track.id}/download`, "_blank");
+	function handleDownloadTrack(version: "REGULAR" | "FULL") {
+		window.open(`/api/tracks/${track.id}/download?version=${version}`, "_blank");
 	}
 
 	return (
@@ -358,6 +406,19 @@ export default function TrackFeedItem({
 									{track.title}
 								</h2>
 							</Link>
+
+							{metadataItems.length > 0 && (
+								<div className="mt-2 flex flex-wrap gap-2">
+									{metadataItems.map((item) => (
+										<span
+											key={item}
+											className="rounded-full bg-[#FAF8ED] px-3 py-1 text-xs font-medium text-[#4E3523]/75"
+										>
+											{item}
+										</span>
+									))}
+								</div>
+							)}
 
 							<div className="mt-4">
 								<div ref={waveContainerRef} />
@@ -416,33 +477,55 @@ export default function TrackFeedItem({
 							Your Track
 						</div>
 					) : track.isForSale ? (
-						<div className="flex items-center gap-2">
-							{isOwned ? (
-								<>
-									<div className="rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523]">
-										Owned
-									</div>
-									<button
-										onClick={handleDownloadTrack}
-										className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED]"
-									>
-										Download
-									</button>
-								</>
+						<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+							{regularOwned ? (
+								<button
+									onClick={() => handleDownloadTrack("REGULAR")}
+									className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED]"
+								>
+									<Download size={16} />
+									Regular WAV
+								</button>
 							) : (
 								<button
-									onClick={handleBuyTrack}
-									disabled={buyLoading}
+									onClick={() => handleBuyTrack("REGULAR")}
+									disabled={buyLoadingVersion !== null}
 									className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED] disabled:opacity-60"
 								>
-									{buyLoading ? "Buying..." : `Buy (${track.priceInPoints ?? 0} pts)`}
+									<ShoppingCart size={16} />
+									{buyLoadingVersion === "REGULAR"
+										? "Buying..."
+										: `Regular ${formatUsd(track.regularPriceCents)}`}
 								</button>
+							)}
+
+							{hasFullVersion && (
+								fullOwned ? (
+									<button
+										onClick={() => handleDownloadTrack("FULL")}
+										className="flex items-center gap-2 rounded-full border border-[#4E3523] px-4 py-2 text-sm font-medium text-[#4E3523]"
+									>
+										<Download size={16} />
+										Full ZIP
+									</button>
+								) : (
+									<button
+										onClick={() => handleBuyTrack("FULL")}
+										disabled={buyLoadingVersion !== null}
+										className="flex items-center gap-2 rounded-full border border-[#4E3523] px-4 py-2 text-sm font-medium text-[#4E3523] disabled:opacity-60"
+									>
+										<ShoppingCart size={16} />
+										{buyLoadingVersion === "FULL"
+											? "Buying..."
+											: `Full ${formatUsd(track.fullPriceCents)}`}
+									</button>
+								)
 							)}
 						</div>
 					) : (
 						<button
 							onClick={() => handleProtectedAction("support")}
-							className="flex items-center gap-2 rounded-full border border-[#4E3523] px-4 py-2 text-sm font-medium text-[#4E3523]"
+							className="ml-auto flex items-center gap-2 rounded-full border border-[#4E3523] px-4 py-2 text-sm font-medium text-[#4E3523]"
 						>
 							Support
 						</button>

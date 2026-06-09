@@ -7,14 +7,23 @@ type TrackFeedListProps = {
 		id: string;
 		title: string;
 		description: string | null;
-		fileUrl: string;
+		previewMp3Url: string;
+		previewFileType?: string | null;
+		regularWavKey?: string | null;
+		fullZipKey?: string | null;
 		trackType?: string | null;
+		bpm?: number | null;
+		timeSignature?: string | null;
+		musicalKey?: string | null;
 		createdAt?: string | Date | null;
 		likesCount: number;
 		isLiked: boolean;
 		commentCount: number;
 		isForSale?: boolean;
-		priceInPoints?: number | null;
+		regularPriceCents?: number | null;
+		fullPriceCents?: number | null;
+		isRegularOwned?: boolean;
+		isFullOwned?: boolean;
 		isOwned?: boolean;
 		isOwner?: boolean;
 		owner?: {

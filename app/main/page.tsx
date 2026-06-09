@@ -34,30 +34,50 @@ export default async function HomePage() {
 			purchases: user
 				? {
 						where: { userId: user.id },
-						select: { id: true },
+						select: {
+							id: true,
+							version: true,
+						},
 					}
 				: false,
 		},
 	});
 
-	const feedTracks = tracks.map((track) => ({
-		id: track.id,
-		title: track.title,
-		description: track.description,
-		fileUrl: track.fileUrl,
-		trackType: track.trackType,
-		createdAt: track.createdAt,
-		likesCount: track._count.likes,
-		commentCount: track._count.comments,
-		isLiked: Array.isArray(track.likes) ? track.likes.length > 0 : false,
-		isForSale: track.isForSale,
-		priceInPoints: track.priceInPoints,
-		isOwned: Array.isArray(track.purchases)
-			? track.purchases.length > 0
-			: false,
-		isOwner: user?.id === track.ownerId,
-		owner: track.owner,
-	}));
+	const feedTracks = tracks.map((track) => {
+		const userPurchases = Array.isArray(track.purchases) ? track.purchases : [];
+		const isRegularOwned = userPurchases.some(
+			(purchase) => purchase.version === "REGULAR" || purchase.version === "FULL",
+		);
+		const isFullOwned = userPurchases.some(
+			(purchase) => purchase.version === "FULL",
+		);
+
+		return {
+			id: track.id,
+			title: track.title,
+			description: track.description,
+			previewMp3Url: track.previewMp3Url,
+			previewFileType: track.previewFileType,
+			regularWavKey: track.regularWavKey,
+			fullZipKey: track.fullZipKey,
+			trackType: track.trackType,
+			bpm: track.bpm,
+			timeSignature: track.timeSignature,
+			musicalKey: track.musicalKey,
+			createdAt: track.createdAt,
+			likesCount: track._count.likes,
+			commentCount: track._count.comments,
+			isLiked: Array.isArray(track.likes) ? track.likes.length > 0 : false,
+			isForSale: track.isForSale,
+			regularPriceCents: track.regularPriceCents,
+			fullPriceCents: track.fullPriceCents,
+			isRegularOwned,
+			isFullOwned,
+			isOwned: isRegularOwned || isFullOwned,
+			isOwner: user?.id === track.ownerId,
+			owner: track.owner,
+		};
+	});
 
 	return (
 		<div className="min-h-screen bg-[#FAF8ED] text-[#4E3523]">
