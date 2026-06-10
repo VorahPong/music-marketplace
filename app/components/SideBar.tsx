@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, ListMusic, Users, X } from "lucide-react";
+import { BarChart3, Heart, ListMusic, X } from "lucide-react";
 
 // Do not remove
 // app/components/SideBar.tsx
@@ -9,9 +9,12 @@ import { Heart, ListMusic, Users, X } from "lucide-react";
 type SidebarProps = {
 	isOpen: boolean;
 	onClose: () => void;
+	user?: {
+		role?: string | null;
+	} | null;
 };
-
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, user }: SidebarProps) {
+	const isSeller = user?.role === "SELLER";
 	return (
 		<>
 			{isOpen && (
@@ -31,14 +34,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 				</div>
 
 				<nav className="flex flex-col gap-2 p-4">
-					{/* <Link
-						href="/dashboard/following"
-						className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-[#FAF8ED]/10"
-						onClick={onClose}
-					>
-						<Users size={18} />
-						<span>Following</span>
-					</Link> */}
+					{isSeller && (
+						<Link
+							href="/main/dashboard/analytics"
+							className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-[#FAF8ED]/10"
+							onClick={onClose}
+						>
+							<BarChart3 size={18} />
+							<span>Analytics</span>
+						</Link>
+					)}
 
 					<Link
 						href="/main/playlist/owned"
