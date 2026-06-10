@@ -48,6 +48,8 @@ model Track {
   comments      Comment[]
   likes         Like[]
   purchases     TrackPurchase[]
+
+  @@index([title])
 }
 
 model TrackPurchase {
