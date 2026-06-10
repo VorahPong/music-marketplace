@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 
+// do not remove
+// app/main/dashboard/create/CreatePageClient.tsx
+
 const TRACK_TYPES = [
 	"SONG",
 	"BEAT",
@@ -9,24 +12,64 @@ const TRACK_TYPES = [
 	"DRUMKIT",
 ] as const;
 
-export default function CreatePageClient() {
-	const [title, setTitle] = useState("");
-	const [description, setDescription] = useState("");
-	const [trackType, setTrackType] =
-		useState<(typeof TRACK_TYPES)[number]>("SONG");
-	const [bpm, setBpm] = useState("");
-	const [timeSignature, setTimeSignature] = useState("4/4");
-	const [musicalKey, setMusicalKey] = useState("");
-	const [isForSale, setIsForSale] = useState(false);
-	const [regularPriceUsd, setRegularPriceUsd] = useState("");
-	const [fullPriceUsd, setFullPriceUsd] = useState("");
+type TrackType = (typeof TRACK_TYPES)[number];
+
+type EditableTrack = {
+	id: string;
+	title: string;
+	description: string | null;
+	trackType: TrackType;
+	bpm: number | null;
+	timeSignature: string | null;
+	musicalKey: string | null;
+	isForSale: boolean;
+	regularPriceCents: number | null;
+	fullPriceCents: number | null;
+	previewMp3Url: string;
+	regularWavKey: string | null;
+	fullZipKey: string | null;
+};
+
+type CreatePageClientProps = {
+	mode?: "create" | "edit";
+	initialTrack?: EditableTrack;
+};
+
+function centsToUsdInput(priceCents?: number | null) {
+	if (!priceCents) return "";
+	return (priceCents / 100).toFixed(2);
+}
+
+export default function CreatePageClient({
+	mode = "create",
+	initialTrack,
+}: CreatePageClientProps) {
+	const isEditMode = mode === "edit";
+
+	const [title, setTitle] = useState(initialTrack?.title ?? "");
+	const [description, setDescription] = useState(initialTrack?.description ?? "");
+	const [trackType, setTrackType] = useState<TrackType>(
+		initialTrack?.trackType ?? "SONG",
+	);
+	const [bpm, setBpm] = useState(initialTrack?.bpm ? String(initialTrack.bpm) : "");
+	const [timeSignature, setTimeSignature] = useState(
+		initialTrack?.timeSignature ?? "4/4",
+	);
+	const [musicalKey, setMusicalKey] = useState(initialTrack?.musicalKey ?? "");
+	const [isForSale, setIsForSale] = useState(initialTrack?.isForSale ?? false);
+	const [regularPriceUsd, setRegularPriceUsd] = useState(
+		centsToUsdInput(initialTrack?.regularPriceCents),
+	);
+	const [fullPriceUsd, setFullPriceUsd] = useState(
+		centsToUsdInput(initialTrack?.fullPriceCents),
+	);
 	const [previewMp3File, setPreviewMp3File] = useState<File | null>(null);
 	const [regularWavFile, setRegularWavFile] = useState<File | null>(null);
 	const [fullZipFile, setFullZipFile] = useState<File | null>(null);
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
 	const [loading, setLoading] = useState(false);
-	const [uploadedUrl, setUploadedUrl] = useState("");
+	const [uploadedUrl, setUploadedUrl] = useState(initialTrack?.previewMp3Url ?? "");
 
 	function handlePreviewMp3Change(e: React.ChangeEvent<HTMLInputElement>) {
 		const selected = e.target.files?.[0];
@@ -78,10 +121,14 @@ export default function CreatePageClient() {
 		e.preventDefault();
 		setError("");
 		setSuccess("");
-		setUploadedUrl("");
 
-		if (!title.trim() || !previewMp3File) {
-			setError("Title and preview MP3 are required.");
+		if (!title.trim()) {
+			setError("Title is required.");
+			return;
+		}
+
+		if (!isEditMode && !previewMp3File) {
+			setError("Preview MP3 is required.");
 			return;
 		}
 
@@ -97,8 +144,14 @@ export default function CreatePageClient() {
 		if (isForSale) {
 			const regularPrice = Number(regularPriceUsd);
 			const fullPrice = Number(fullPriceUsd);
+			const hasExistingRegularWav = Boolean(initialTrack?.regularWavKey);
 
-			if (!regularWavFile) {
+			if (!isEditMode && !regularWavFile) {
+				setError("Please upload a WAV file for the regular version.");
+				return;
+			}
+
+			if (isEditMode && !hasExistingRegularWav && !regularWavFile) {
 				setError("Please upload a WAV file for the regular version.");
 				return;
 			}
@@ -109,6 +162,11 @@ export default function CreatePageClient() {
 			}
 
 			if (fullZipFile && (!fullPriceUsd.trim() || Number.isNaN(fullPrice) || fullPrice <= 0)) {
+				setError("Please enter a valid full version price in USD.");
+				return;
+			}
+
+			if (isEditMode && initialTrack?.fullZipKey && fullPriceUsd.trim() && (Number.isNaN(fullPrice) || fullPrice <= 0)) {
 				setError("Please enter a valid full version price in USD.");
 				return;
 			}
@@ -126,8 +184,11 @@ export default function CreatePageClient() {
 			formData.append("musicalKey", musicalKey);
 			formData.append("isForSale", String(isForSale));
 			formData.append("regularPriceUsd", isForSale ? regularPriceUsd : "");
-			formData.append("fullPriceUsd", isForSale && fullZipFile ? fullPriceUsd : "");
-			formData.append("previewMp3File", previewMp3File);
+			formData.append("fullPriceUsd", isForSale ? fullPriceUsd : "");
+
+			if (previewMp3File) {
+				formData.append("previewMp3File", previewMp3File);
+			}
 
 			if (isForSale && regularWavFile) {
 				formData.append("regularWavFile", regularWavFile);
@@ -137,35 +198,43 @@ export default function CreatePageClient() {
 				formData.append("fullZipFile", fullZipFile);
 			}
 
-			const res = await fetch("/api/upload", {
-				method: "POST",
-				body: formData,
-			});
+			const res = await fetch(
+				isEditMode && initialTrack
+					? `/api/tracks/${initialTrack.id}`
+					: "/api/upload",
+				{
+					method: isEditMode ? "PATCH" : "POST",
+					body: formData,
+				},
+			);
 
 			const data = await res.json();
 
 			if (!res.ok) {
-				setError(data.error || "Upload failed.");
+				setError(data.error || `${isEditMode ? "Update" : "Upload"} failed.`);
 				return;
 			}
 
-			setSuccess("Upload successful.");
-			setUploadedUrl(data.data.fileUrl);
-			setTitle("");
-			setDescription("");
-			setTrackType("SONG");
-			setBpm("");
-			setTimeSignature("4/4");
-			setMusicalKey("");
-			setIsForSale(false);
-			setRegularPriceUsd("");
-			setFullPriceUsd("");
+			setSuccess(isEditMode ? "Track updated successfully." : "Upload successful.");
+			setUploadedUrl(data.data?.previewMp3Url || data.data?.fileUrl || uploadedUrl);
 			setPreviewMp3File(null);
 			setRegularWavFile(null);
 			setFullZipFile(null);
+
+			if (!isEditMode) {
+				setTitle("");
+				setDescription("");
+				setTrackType("SONG");
+				setBpm("");
+				setTimeSignature("4/4");
+				setMusicalKey("");
+				setIsForSale(false);
+				setRegularPriceUsd("");
+				setFullPriceUsd("");
+			}
 		} catch (error) {
 			console.error(error);
-			setError("Upload failed. Please try again.");
+			setError(`${isEditMode ? "Update" : "Upload"} failed. Please try again.`);
 		} finally {
 			setLoading(false);
 		}
@@ -174,10 +243,13 @@ export default function CreatePageClient() {
 	return (
 		<div className="min-h-screen bg-[#FAF8ED] px-4 text-[#4E3523]">
 			<div className="mx-auto mt-10 max-w-2xl">
-				<h1 className="text-2xl font-bold">Upload Audio</h1>
+				<h1 className="text-2xl font-bold">
+					{isEditMode ? "Edit Track" : "Upload Audio"}
+				</h1>
 				<p className="mt-2 text-[#4E3523]/70">
-					Upload a fast MP3 preview for customers to stream. Add a protected WAV
-					for the regular version and an optional ZIP for the full version.
+					{isEditMode
+						? "Update your track details, pricing, and replace files when needed. Leave file inputs empty to keep the current files."
+						: "Upload a fast MP3 preview for customers to stream. Add a protected WAV for the regular version and an optional ZIP for the full version."}
 				</p>
 
 				<form
@@ -217,7 +289,7 @@ export default function CreatePageClient() {
 								value={trackType}
 								onChange={(e) =>
 									setTrackType(
-										e.target.value as (typeof TRACK_TYPES)[number]
+										e.target.value as TrackType,
 									)
 								}
 								className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
@@ -365,7 +437,9 @@ export default function CreatePageClient() {
 								className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm"
 							/>
 							<p className="mt-1 text-xs text-[#4E3523]/60">
-								Public streaming preview. This should be optimized for fast playback.
+								{isEditMode
+									? "Leave empty to keep the current MP3 preview."
+									: "Public streaming preview. This should be optimized for fast playback."}
 							</p>
 
 							{previewMp3File && (
@@ -388,7 +462,9 @@ export default function CreatePageClient() {
 										className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm"
 									/>
 									<p className="mt-1 text-xs text-[#4E3523]/60">
-										Protected download after regular purchase.
+										{isEditMode
+											? "Leave empty to keep the current regular WAV."
+											: "Protected download after regular purchase."}
 									</p>
 
 									{regularWavFile && (
@@ -409,7 +485,9 @@ export default function CreatePageClient() {
 										className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm"
 									/>
 									<p className="mt-1 text-xs text-[#4E3523]/60">
-										Optional protected download after full purchase. Use this for stems, license files, or project files.
+										{isEditMode
+											? "Leave empty to keep the current full ZIP."
+											: "Optional protected download after full purchase. Use this for stems, license files, or project files."}
 									</p>
 
 									{fullZipFile && (
@@ -439,20 +517,28 @@ export default function CreatePageClient() {
 						disabled={loading}
 						className="w-full rounded-xl bg-[#4E3523] px-4 py-3 text-sm font-medium text-[#FAF8ED] hover:opacity-90 disabled:opacity-60"
 					>
-						{loading ? "Uploading..." : "Upload"}
+						{loading
+							? isEditMode
+								? "Updating..."
+								: "Uploading..."
+							: isEditMode
+								? "Save Changes"
+								: "Upload"}
 					</button>
 				</form>
 
 				{uploadedUrl && (
 					<div className="mt-6 rounded-xl border border-[#D6CFC7] bg-white p-4">
-						<p className="text-sm font-medium">Uploaded file:</p>
+						<p className="text-sm font-medium">
+							{isEditMode ? "Current preview:" : "Uploaded preview:"}
+						</p>
 						<a
 							href={uploadedUrl}
 							target="_blank"
 							rel="noreferrer"
 							className="mt-2 inline-block text-sm text-blue-600 underline"
 						>
-							Open uploaded audio
+							Open preview audio
 						</a>
 						<audio controls className="mt-4 w-full">
 							<source src={uploadedUrl} />

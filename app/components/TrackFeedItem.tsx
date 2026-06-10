@@ -9,12 +9,16 @@ import {
 	Share2,
 	Download,
 	ShoppingCart,
+	Pencil,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import WaveSurfer from "wavesurfer.js";
 import ShareTrackModal from "./ShareTrackModal";
 import { usePlayer } from "./player/PlayerProvider";
+
+// do not remove
+// app/components/TrackFeedItem.tsx
 
 type TrackFeedItemProps = {
 	track: {
@@ -360,7 +364,10 @@ export default function TrackFeedItem({
 	}
 
 	function handleDownloadTrack(version: "REGULAR" | "FULL") {
-		window.open(`/api/tracks/${track.id}/download?version=${version}`, "_blank");
+		window.open(
+			`/api/tracks/${track.id}/download?version=${version}`,
+			"_blank",
+		);
 	}
 
 	return (
@@ -476,9 +483,13 @@ export default function TrackFeedItem({
 					</button>
 
 					{track.isOwner ? (
-						<div className="rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523]">
-							Your Track
-						</div>
+						<Link
+							href={`/main/dashboard/edit/${track.id}`}
+							className="ml-auto flex items-center gap-2 rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#EAD9C7]"
+						>
+							<Pencil size={16} />
+							Edit Track
+						</Link>
 					) : track.isForSale ? (
 						<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
 							{regularOwned ? (
@@ -502,8 +513,8 @@ export default function TrackFeedItem({
 								</button>
 							)}
 
-							{hasFullVersion && (
-								fullOwned ? (
+							{hasFullVersion &&
+								(fullOwned ? (
 									<button
 										onClick={() => handleDownloadTrack("FULL")}
 										className="flex items-center gap-2 rounded-full border border-[#4E3523] px-4 py-2 text-sm font-medium text-[#4E3523]"
@@ -522,8 +533,7 @@ export default function TrackFeedItem({
 											? "Buying..."
 											: `Full ${formatUsd(track.fullPriceCents)}`}
 									</button>
-								)
-							)}
+								))}
 						</div>
 					) : (
 						<button
