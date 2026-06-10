@@ -19,14 +19,18 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 		rawSearchQuery.length >= 2 ? rawSearchQuery.slice(0, 80) : "";
 
 	const tracks = await prisma.track.findMany({
-		where: searchQuery
-			? {
-					title: {
-						contains: searchQuery,
-						mode: "insensitive",
-					},
-				}
-			: undefined,
+		where: {
+			isPublished: true,
+			deletedAt: null,
+			...(searchQuery
+				? {
+						title: {
+							contains: searchQuery,
+							mode: "insensitive" as const,
+						},
+					}
+				: {}),
+		},
 		orderBy: {
 			createdAt: "desc",
 		},
@@ -74,6 +78,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 			(purchase) => purchase.version === "FULL",
 		);
 
+		const regularPurchase = userPurchases.find(
+			(purchase) => purchase.version === "REGULAR",
+		);
+		const fullPurchase = userPurchases.find(
+			(purchase) => purchase.version === "FULL",
+		);
+
 		return {
 			id: track.id,
 			title: track.title,
@@ -96,6 +107,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 			isRegularOwned,
 			isFullOwned,
 			isOwned: isRegularOwned || isFullOwned,
+			regularPurchaseId: regularPurchase?.id ?? fullPurchase?.id ?? null,
+			fullPurchaseId: fullPurchase?.id ?? null,
 			isOwner: user?.id === track.ownerId,
 			owner: track.owner,
 		};

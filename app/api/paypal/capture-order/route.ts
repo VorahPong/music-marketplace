@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPayPalAccessToken } from "@/lib/paypal";
-
+// do not remove
+// app/api/paypal/capture-order/route.ts
 const PAYPAL_BASE_URL =
 	process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com";
 
@@ -12,6 +13,18 @@ type PayPalCustomId = {
 	version: "REGULAR" | "FULL";
 	amountCents: number;
 };
+
+function createReceiptNumber({
+	userId,
+	trackId,
+	version,
+}: {
+	userId: string;
+	trackId: string;
+	version: "REGULAR" | "FULL";
+}) {
+	return `RCPT-${trackId.slice(-8).toUpperCase()}-${userId.slice(-8).toUpperCase()}-${version}`;
+}
 
 export async function POST(req: Request) {
 	try {
@@ -61,7 +74,10 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const customIdRaw = data.purchase_units?.[0]?.payments?.captures?.[0]?.custom_id;
+		const capture = data.purchase_units?.[0]?.payments?.captures?.[0];
+		const customIdRaw = capture?.custom_id;
+		const paypalOrderId = data.id || orderId;
+		const paypalCaptureId = capture?.id ?? null;
 
 		if (!customIdRaw) {
 			return NextResponse.json(
@@ -150,6 +166,12 @@ export async function POST(req: Request) {
 			);
 		}
 
+		const receiptNumber = createReceiptNumber({
+			userId: user.id,
+			trackId: track.id,
+			version: customId.version,
+		});
+
 		const purchase = await prisma.trackPurchase.upsert({
 			where: {
 				userId_trackId_version: {
@@ -158,12 +180,21 @@ export async function POST(req: Request) {
 					version: customId.version,
 				},
 			},
-			update: {},
+			update: {
+				receiptNumber,
+				paypalOrderId,
+				paypalCaptureId,
+				licenseType: "STANDARD",
+			},
 			create: {
 				userId: user.id,
 				trackId: track.id,
 				version: customId.version,
 				amountCents: expectedPriceCents,
+				receiptNumber,
+				paypalOrderId,
+				paypalCaptureId,
+				licenseType: "STANDARD",
 			},
 		});
 

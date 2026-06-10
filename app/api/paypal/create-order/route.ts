@@ -38,6 +38,8 @@ export async function POST(req: Request) {
 				id: true,
 				title: true,
 				isForSale: true,
+				isPublished: true,
+				deletedAt: true,
 				ownerId: true,
 				regularWavKey: true,
 				fullZipKey: true,
@@ -56,6 +58,13 @@ export async function POST(req: Request) {
 		if (track.ownerId === user.id) {
 			return NextResponse.json(
 				{ error: "You cannot buy your own track." },
+				{ status: 400 },
+			);
+		}
+
+		if (!track.isPublished || track.deletedAt) {
+			return NextResponse.json(
+				{ error: "This track is no longer available for purchase." },
 				{ status: 400 },
 			);
 		}
@@ -79,20 +88,33 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const existingPurchase = await prisma.trackPurchase.findUnique({
+		const existingPurchases = await prisma.trackPurchase.findMany({
 			where: {
-				userId_trackId_version: {
-					userId: user.id,
-					trackId: track.id,
-					version,
-				},
+				userId: user.id,
+				trackId: track.id,
 			},
-			select: { id: true },
+			select: {
+				version: true,
+			},
 		});
 
-		if (existingPurchase) {
+		const alreadyOwnsRegular = existingPurchases.some(
+			(purchase) => purchase.version === "REGULAR" || purchase.version === "FULL",
+		);
+		const alreadyOwnsFull = existingPurchases.some(
+			(purchase) => purchase.version === "FULL",
+		);
+
+		if (version === "REGULAR" && alreadyOwnsRegular) {
 			return NextResponse.json(
-				{ error: "You already own this version." },
+				{ error: "You already own access to the regular version." },
+				{ status: 400 },
+			);
+		}
+
+		if (version === "FULL" && alreadyOwnsFull) {
+			return NextResponse.json(
+				{ error: "You already own the full version." },
 				{ status: 400 },
 			);
 		}
@@ -129,6 +151,7 @@ export async function POST(req: Request) {
 							version,
 							amountCents: priceCents,
 						}),
+						invoice_id: `${track.id}-${user.id}-${version}`,
 					},
 				],
 			}),

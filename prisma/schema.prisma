@@ -57,17 +57,25 @@ model Track {
 }
 
 model TrackPurchase {
-  id        String   @id @default(cuid())
-  userId    String
-  trackId   String
-  version     PurchaseVersion @default(REGULAR)
-  amountCents Int
-  createdAt DateTime @default(now())
+  id              String          @id @default(cuid())
+  userId          String
+  trackId         String
+  version         PurchaseVersion @default(REGULAR)
+  amountCents     Int
+  receiptNumber   String?         @unique
+  paypalOrderId   String?
+  paypalCaptureId String?
+  licenseType     LicenseType     @default(STANDARD)
+  createdAt       DateTime        @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track           Track           @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId, version])
+  @@index([receiptNumber])
+  @@index([paypalOrderId])
+  @@index([paypalCaptureId])
+  @@index([createdAt])
 }
 
 model Like {
@@ -120,4 +128,9 @@ enum UserRole {
 enum PurchaseVersion {
   REGULAR
   FULL
+}
+
+enum LicenseType {
+  STANDARD
+  CUSTOM
 }
