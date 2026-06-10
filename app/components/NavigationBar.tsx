@@ -38,7 +38,6 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 	const [searchValue, setSearchValue] = useState(searchParams.get("q") ?? "");
 
 	const profileRef = useRef<HTMLDivElement | null>(null);
-	const pointsRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
 		function handleClickOutside(event: MouseEvent) {
@@ -138,10 +137,12 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 						</Link>
 					)}
 
-					<button className="text-[#FAF8ED]">
+					{/* Notification */}
+					{/* <button className="text-[#FAF8ED]">
 						<Bell size={20} />
-					</button>
+					</button> */}
 
+					
 					<div className="relative" ref={profileRef}>
 						<button
 							onClick={() => {
@@ -154,13 +155,13 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 							className="h-8 w-8 overflow-hidden rounded-full bg-gray-300 ring-2 ring-transparent transition hover:ring-[#FAF8ED]/60 flex items-center justify-center"
 						>
 							{user ? (
-								<img
-									src={`https://i.pravatar.cc/100?u=${user.id}`}
-									alt="profile"
-									className="h-full w-full object-cover"
-								/>
+								<span className="flex h-full w-full items-center justify-center rounded-full bg-[#EAD9C7] text-sm font-bold text-[#4E3523]">
+									{(user.name?.trim()?.charAt(0) || user.email.charAt(0)).toUpperCase()}
+								</span>
 							) : (
-								<span className="text-[#4E3523] text-sm font-semibold">?</span>
+								<span className="flex h-full w-full items-center justify-center rounded-full bg-[#EAD9C7] text-sm font-bold text-[#4E3523]">
+									?
+								</span>
 							)}
 						</button>
 

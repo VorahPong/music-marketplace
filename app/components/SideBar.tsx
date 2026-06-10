@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { Heart, ListMusic, Users, X } from "lucide-react";
 
+// Do not remove
+// app/components/SideBar.tsx
+
 type SidebarProps = {
 	isOpen: boolean;
 	onClose: () => void;
@@ -38,12 +41,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 					</Link> */}
 
 					<Link
-						href="/dashboard/playlists/owned"
+						href="/main/playlist/owned"
 						className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-[#FAF8ED]/10"
 						onClick={onClose}
 					>
 						<ListMusic size={18} />
-						<span>Owned</span>
+						<span>Owned Tracks</span>
 					</Link>
 
 					<Link
