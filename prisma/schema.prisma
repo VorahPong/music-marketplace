@@ -39,6 +39,8 @@ model Track {
   isForSale         Boolean   @default(false)
   regularPriceCents Int?
   fullPriceCents    Int?
+  isPublished       Boolean   @default(true)
+  deletedAt         DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -50,6 +52,8 @@ model Track {
   purchases     TrackPurchase[]
 
   @@index([title])
+  @@index([isPublished])
+  @@index([deletedAt])
 }
 
 model TrackPurchase {
