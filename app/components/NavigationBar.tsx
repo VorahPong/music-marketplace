@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
 	Menu,
 	Search,
@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 import Sidebar from "./SideBar";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+// do not remove
+// app/components/NavigationBar.tsx
 
 type NavigationBarProps = {
 	user: {
@@ -28,9 +32,12 @@ type NavigationBarProps = {
 export default function NavigationBar({ user }: NavigationBarProps) {
 	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 	const [isProfileOpen, setIsProfileOpen] = useState(false);
+	const router = useRouter();
+	const pathname = usePathname();
+	const searchParams = useSearchParams();
+	const [searchValue, setSearchValue] = useState(searchParams.get("q") ?? "");
 
 	const profileRef = useRef<HTMLDivElement | null>(null);
-	const pointsRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
 		function handleClickOutside(event: MouseEvent) {
@@ -47,6 +54,28 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 			document.removeEventListener("mousedown", handleClickOutside);
 		};
 	}, []);
+
+	useEffect(() => {
+		setSearchValue(searchParams.get("q") ?? "");
+	}, [searchParams]);
+
+	function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+
+		const trimmedSearch = searchValue.trim();
+
+		if (!trimmedSearch) {
+			router.push("/main");
+			return;
+		}
+
+		router.push(`/main?q=${encodeURIComponent(trimmedSearch)}`);
+	}
+
+	function handleClearSearch() {
+		setSearchValue("");
+		router.push("/main");
+	}
 
 	return (
 		<>
@@ -72,18 +101,31 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 					</Link>
 				</div>
 
-				<div className="mx-6 flex-1 max-w-xl">
+				<form onSubmit={handleSearchSubmit} className="mx-6 max-w-xl flex-1">
 					<div className="flex items-center overflow-hidden rounded-full bg-[#FAF8ED]">
 						<input
 							type="text"
-							placeholder="Search"
+							value={searchValue}
+							onChange={(event) => setSearchValue(event.target.value)}
+							placeholder="Search by title"
 							className="w-full bg-transparent px-4 py-2 text-sm text-[#4E3523] outline-none"
 						/>
-						<div className="px-4 text-[#4E3523]">
+
+						{pathname === "/main" && searchValue.trim() && (
+							<button
+								type="button"
+								onClick={handleClearSearch}
+								className="px-2 text-xs font-medium text-[#4E3523]/60 hover:text-[#4E3523]"
+							>
+								Clear
+							</button>
+						)}
+
+						<button type="submit" className="px-4 text-[#4E3523]">
 							<Search size={18} />
-						</div>
+						</button>
 					</div>
-				</div>
+				</form>
 
 				<div className="flex items-center gap-4">
 					{user?.role === "SELLER" && (
@@ -95,10 +137,12 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 						</Link>
 					)}
 
-					<button className="text-[#FAF8ED]">
+					{/* Notification */}
+					{/* <button className="text-[#FAF8ED]">
 						<Bell size={20} />
-					</button>
+					</button> */}
 
+					
 					<div className="relative" ref={profileRef}>
 						<button
 							onClick={() => {
@@ -111,13 +155,13 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 							className="h-8 w-8 overflow-hidden rounded-full bg-gray-300 ring-2 ring-transparent transition hover:ring-[#FAF8ED]/60 flex items-center justify-center"
 						>
 							{user ? (
-								<img
-									src={`https://i.pravatar.cc/100?u=${user.id}`}
-									alt="profile"
-									className="h-full w-full object-cover"
-								/>
+								<span className="flex h-full w-full items-center justify-center rounded-full bg-[#EAD9C7] text-sm font-bold text-[#4E3523]">
+									{(user.name?.trim()?.charAt(0) || user.email.charAt(0)).toUpperCase()}
+								</span>
 							) : (
-								<span className="text-[#4E3523] text-sm font-semibold">?</span>
+								<span className="flex h-full w-full items-center justify-center rounded-full bg-[#EAD9C7] text-sm font-bold text-[#4E3523]">
+									?
+								</span>
 							)}
 						</button>
 

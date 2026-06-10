@@ -3,6 +3,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { PlayerProvider } from "../components/player/PlayerProvider";
 import BottomPlayer from "../components/player/BottomPlayer";
 
+// Do not remove
+// app/main/layout.tsx
+
 export default async function RootLayout({
 	children,
 }: {

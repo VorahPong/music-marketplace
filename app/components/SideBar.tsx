@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { Heart, ListMusic, Users, X } from "lucide-react";
 
+// Do not remove
+// app/components/SideBar.tsx
+
 type SidebarProps = {
 	isOpen: boolean;
 	onClose: () => void;
@@ -21,29 +24,29 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 				}`}
 			>
 				<div className="flex items-center justify-between border-b border-[#FAF8ED]/20 px-5 py-4">
-					<h2 className="text-lg font-semibold">Music Market</h2>
+					<h2 className="text-lg font-semibold">Music World</h2>
 					<button onClick={onClose} className="hover:opacity-80">
 						<X size={22} />
 					</button>
 				</div>
 
 				<nav className="flex flex-col gap-2 p-4">
-					<Link
+					{/* <Link
 						href="/dashboard/following"
 						className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-[#FAF8ED]/10"
 						onClick={onClose}
 					>
 						<Users size={18} />
 						<span>Following</span>
-					</Link>
+					</Link> */}
 
 					<Link
-						href="/dashboard/playlists"
+						href="/main/playlist/owned"
 						className="flex items-center gap-3 rounded-xl px-4 py-3 hover:bg-[#FAF8ED]/10"
 						onClick={onClose}
 					>
 						<ListMusic size={18} />
-						<span>Playlists</span>
+						<span>Owned Tracks</span>
 					</Link>
 
 					<Link

@@ -1,20 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Music2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import TrackFeedList from "@/app/components/TrackFeedList";
 
-// Do not remove
-// app/main/playlist/liked/page.tsx
+// do not remove
+// app/main/playlist/owned/page.tsx
 
-export default async function LikedPlaylistPage() {
+export default async function OwnedTracksPage() {
 	const user = await getCurrentUser();
 
 	if (!user) {
 		redirect("/auth/login");
 	}
 
-	const likedTracks = await prisma.like.findMany({
+	const purchases = await prisma.trackPurchase.findMany({
 		where: {
 			userId: user.id,
 		},
@@ -53,7 +54,15 @@ export default async function LikedPlaylistPage() {
 		},
 	});
 
-	const feedTracks = likedTracks.map(({ track }) => {
+	const uniqueTracksMap = new Map<string, (typeof purchases)[number]["track"]>();
+
+	for (const purchase of purchases) {
+		if (!uniqueTracksMap.has(purchase.track.id)) {
+			uniqueTracksMap.set(purchase.track.id, purchase.track);
+		}
+	}
+
+	const ownedTracks = Array.from(uniqueTracksMap.values()).map((track) => {
 		const userPurchases = Array.isArray(track.purchases) ? track.purchases : [];
 		const isRegularOwned = userPurchases.some(
 			(purchase) => purchase.version === "REGULAR" || purchase.version === "FULL",
@@ -77,7 +86,7 @@ export default async function LikedPlaylistPage() {
 			createdAt: track.createdAt,
 			likesCount: track._count.likes,
 			commentCount: track._count.comments,
-			isLiked: Array.isArray(track.likes) ? track.likes.length > 0 : true,
+			isLiked: Array.isArray(track.likes) ? track.likes.length > 0 : false,
 			isForSale: track.isForSale,
 			regularPriceCents: track.regularPriceCents,
 			fullPriceCents: track.fullPriceCents,
@@ -90,33 +99,40 @@ export default async function LikedPlaylistPage() {
 	});
 
 	return (
-		<div className="min-h-screen bg-[#FAF8ED] px-6 py-10 text-[#4E3523]">
-			<div className="mx-auto max-w-6xl">
-				<div className="mb-8">
-					<h1 className="text-3xl font-bold">Liked Playlist</h1>
-					<p className="mt-2 text-sm text-[#4E3523]/70">
-						All the tracks you’ve liked in one place.
-					</p>
+		<main className="min-h-screen bg-[#FAF8ED] px-6 py-10 text-[#4E3523]">
+			<section className="mx-auto max-w-5xl">
+				<div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+					<div>
+						<h1 className="text-3xl font-bold">Owned Tracks</h1>
+						<p className="mt-2 text-[#4E3523]/70">
+							All regular WAV and full ZIP versions you have purchased.
+						</p>
+					</div>
+
+					<Link
+						href="/main"
+						className="rounded-full bg-[#4E3523] px-5 py-3 text-sm font-semibold text-[#FAF8ED]"
+					>
+						Browse Marketplace
+					</Link>
 				</div>
 
-				{likedTracks.length === 0 ? (
-					<div className="rounded-3xl border border-[#D6CFC7] bg-white p-10 text-center shadow-sm">
-						<h2 className="text-xl font-semibold">No liked tracks yet</h2>
+				{ownedTracks.length === 0 ? (
+					<div className="mt-10 rounded-3xl border border-[#D6CFC7] bg-white p-8 text-center shadow-sm">
+						<div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#FAF8ED]">
+							<Music2 size={28} />
+						</div>
+						<h2 className="mt-5 text-xl font-semibold">No owned tracks yet</h2>
 						<p className="mt-2 text-sm text-[#4E3523]/70">
-							Go explore music and tap the like button on tracks you enjoy.
+							Purchased tracks will show up here with download buttons.
 						</p>
-
-						<Link
-							href="/main"
-							className="mt-5 inline-block rounded-xl bg-[#4E3523] px-5 py-3 text-sm font-medium text-[#FAF8ED] hover:opacity-90"
-						>
-							Explore Tracks
-						</Link>
 					</div>
 				) : (
-					<TrackFeedList tracks={feedTracks} isGuest={false} />
+					<div className="mt-8">
+						<TrackFeedList tracks={ownedTracks} isGuest={false} />
+					</div>
 				)}
-			</div>
-		</div>
+			</section>
+		</main>
 	);
 }
