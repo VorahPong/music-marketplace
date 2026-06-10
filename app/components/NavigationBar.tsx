@@ -189,7 +189,7 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 									</Link>
 
 									<Link
-										href={user ? `/settings` : "/auth/login"}
+										href={user ? `/main/settings` : "/auth/login"}
 										className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
 										onClick={() => setIsProfileOpen(false)}
 									>
