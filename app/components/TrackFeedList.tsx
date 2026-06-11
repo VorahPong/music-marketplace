@@ -2,6 +2,9 @@
 
 import TrackFeedItem from "./TrackFeedItem";
 
+// do not remove
+// app/components/TrackFeedList.tsx
+
 type TrackFeedListProps = {
 	tracks: {
 		id: string;
@@ -25,6 +28,8 @@ type TrackFeedListProps = {
 		isRegularOwned?: boolean;
 		isFullOwned?: boolean;
 		isOwned?: boolean;
+		regularPurchaseId?: string | null;
+		fullPurchaseId?: string | null;
 		isOwner?: boolean;
 		owner?: {
 			id: string;

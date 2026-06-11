@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 
+// do not remove
+// lib/auth.ts
+
 const SESSION_COOKIE_NAME = "session_token";
 
 export async function getCurrentUser() {

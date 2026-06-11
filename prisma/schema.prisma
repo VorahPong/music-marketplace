@@ -8,20 +8,23 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  name         String?
-  handle       String    @unique
-  email        String    @unique
-  passwordHash String
-  role         UserRole  @default(CUSTOMER)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  name              String?
+  handle            String    @unique
+  email             String    @unique
+  passwordHash      String
+  role              UserRole  @default(CUSTOMER)
+  emailVerifiedAt   DateTime?
+  twoFactorEnabled  Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  tracks       Track[]
-  sessions     Session[]
-  comments     Comment[]
-  likes        Like[]
-  purchases    TrackPurchase[]
+  tracks            Track[]
+  sessions          Session[]
+  authCodes         AuthCode[]
+  comments          Comment[]
+  likes             Like[]
+  purchases         TrackPurchase[]
 }
 
 model Track {
@@ -39,6 +42,8 @@ model Track {
   isForSale         Boolean   @default(false)
   regularPriceCents Int?
   fullPriceCents    Int?
+  isPublished       Boolean   @default(true)
+  deletedAt         DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -50,20 +55,30 @@ model Track {
   purchases     TrackPurchase[]
 
   @@index([title])
+  @@index([isPublished])
+  @@index([deletedAt])
 }
 
 model TrackPurchase {
-  id        String   @id @default(cuid())
-  userId    String
-  trackId   String
-  version     PurchaseVersion @default(REGULAR)
-  amountCents Int
-  createdAt DateTime @default(now())
+  id              String          @id @default(cuid())
+  userId          String
+  trackId         String
+  version         PurchaseVersion @default(REGULAR)
+  amountCents     Int
+  receiptNumber   String?         @unique
+  paypalOrderId   String?
+  paypalCaptureId String?
+  licenseType     LicenseType     @default(STANDARD)
+  createdAt       DateTime        @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  track     Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track           Track           @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([userId, trackId, version])
+  @@index([receiptNumber])
+  @@index([paypalOrderId])
+  @@index([paypalCaptureId])
+  @@index([createdAt])
 }
 
 model Like {
@@ -86,6 +101,21 @@ model Session {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuthCode {
+  id        String          @id @default(cuid())
+  userId    String
+  codeHash  String
+  purpose   AuthCodePurpose
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime        @default(now())
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
 }
 
 model Comment {
@@ -113,7 +143,18 @@ enum UserRole {
   SELLER
 }
 
+enum AuthCodePurpose {
+  REGISTER
+  LOGIN
+  RESET_PASSWORD
+}
+
 enum PurchaseVersion {
   REGULAR
   FULL
+}
+
+enum LicenseType {
+  STANDARD
+  CUSTOM
 }

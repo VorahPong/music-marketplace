@@ -1,6 +1,18 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcrypt";
 import { NextResponse } from "next/server";
+import crypto from "crypto";
+import { sendVerificationCodeEmail } from "@/lib/email";
+
+// app/api/register/route.ts
+
+function generateSixDigitCode() {
+	return crypto.randomInt(100000, 1000000).toString();
+}
+
+async function hashAuthCode(code: string) {
+	return bcrypt.hash(code, 10);
+}
 
 export async function POST(req: Request) {
 	try {
@@ -67,6 +79,10 @@ export async function POST(req: Request) {
 
 		const passwordHash = await bcrypt.hash(password, 10);
 
+		const verificationCode = generateSixDigitCode();
+		const codeHash = await hashAuthCode(verificationCode);
+		const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
 		const user = await prisma.user.create({
 			data: {
 				name: name || null,
@@ -74,18 +90,39 @@ export async function POST(req: Request) {
 				email,
 				passwordHash,
 				role: "CUSTOMER",
+				emailVerifiedAt: null,
+				twoFactorEnabled: true,
+				authCodes: {
+					create: {
+						codeHash,
+						purpose: "REGISTER",
+						expiresAt,
+					},
+				},
 			},
 			select: {
 				id: true,
 				name: true,
 				handle: true,
 				email: true,
+				emailVerifiedAt: true,
 			},
 		});
 
+		await sendVerificationCodeEmail({
+			to: email,
+			code: verificationCode,
+			purpose: "REGISTER",
+		});
+
+		console.log(`Registration verification code for ${email}: ${verificationCode}`);
+
 		return NextResponse.json(
 			{
-				message: "Account created successfully.",
+				message:
+					"Account created successfully. Please verify your email with the 6-digit code.",
+				requiresVerification: true,
+				verificationPurpose: "REGISTER",
 				user,
 			},
 			{ status: 201 },

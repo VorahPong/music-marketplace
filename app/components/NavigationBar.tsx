@@ -25,7 +25,6 @@ type NavigationBarProps = {
 		email: string;
 		handle: string;
 		role: string;
-		points: number;
 	} | null;
 };
 
@@ -79,7 +78,11 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 
 	return (
 		<>
-			<Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+			<Sidebar
+				isOpen={isSidebarOpen}
+				onClose={() => setIsSidebarOpen(false)}
+				user={user}
+			/>
 
 			<div className="relative w-full bg-[#4E3523] px-6 py-3 flex items-center justify-between">
 				<div className="flex items-center gap-6">
@@ -142,7 +145,6 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 						<Bell size={20} />
 					</button> */}
 
-					
 					<div className="relative" ref={profileRef}>
 						<button
 							onClick={() => {
@@ -156,7 +158,9 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 						>
 							{user ? (
 								<span className="flex h-full w-full items-center justify-center rounded-full bg-[#EAD9C7] text-sm font-bold text-[#4E3523]">
-									{(user.name?.trim()?.charAt(0) || user.email.charAt(0)).toUpperCase()}
+									{(
+										user.name?.trim()?.charAt(0) || user.email.charAt(0)
+									).toUpperCase()}
 								</span>
 							) : (
 								<span className="flex h-full w-full items-center justify-center rounded-full bg-[#EAD9C7] text-sm font-bold text-[#4E3523]">
@@ -185,7 +189,7 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 									</Link>
 
 									<Link
-										href={user ? `/settings` : "/auth/login"}
+										href={user ? `/main/settings` : "/auth/login"}
 										className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
 										onClick={() => setIsProfileOpen(false)}
 									>

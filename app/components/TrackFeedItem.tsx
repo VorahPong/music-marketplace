@@ -10,6 +10,8 @@ import {
 	Download,
 	ShoppingCart,
 	Pencil,
+	FileText,
+	Receipt,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -43,6 +45,8 @@ type TrackFeedItemProps = {
 		isRegularOwned?: boolean;
 		isFullOwned?: boolean;
 		isOwned?: boolean;
+		regularPurchaseId?: string | null;
+		fullPurchaseId?: string | null;
 		isOwner?: boolean;
 		owner?: {
 			name: string | null;
@@ -74,6 +78,8 @@ export default function TrackFeedItem({
 	const previewUrl = track.previewMp3Url;
 	const isRegularOwned = track.isRegularOwned ?? track.isOwned ?? false;
 	const isFullOwned = track.isFullOwned ?? false;
+	const regularPurchaseId = track.regularPurchaseId ?? null;
+	const fullPurchaseId = track.fullPurchaseId ?? null;
 	const hasFullVersion = Boolean(track.fullZipKey && track.fullPriceCents);
 
 	const displayTrackType = track.trackType
@@ -370,6 +376,15 @@ export default function TrackFeedItem({
 		);
 	}
 
+	function openPurchaseDocument(
+		purchaseId: string | null,
+		documentType: "license" | "receipt",
+	) {
+		if (!purchaseId) return;
+
+		window.open(`/api/purchases/${purchaseId}/${documentType}`, "_blank");
+	}
+
 	return (
 		<>
 			<div className="relative rounded-3xl border border-[#D6CFC7] bg-white p-4 shadow-sm">
@@ -493,13 +508,35 @@ export default function TrackFeedItem({
 					) : track.isForSale ? (
 						<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
 							{regularOwned ? (
-								<button
-									onClick={() => handleDownloadTrack("REGULAR")}
-									className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED]"
-								>
-									<Download size={16} />
-									Regular WAV
-								</button>
+								<div className="flex flex-wrap items-center justify-end gap-2">
+									<button
+										onClick={() => handleDownloadTrack("REGULAR")}
+										className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED]"
+									>
+										<Download size={16} />
+										Regular WAV
+									</button>
+
+									{regularPurchaseId && (
+										<>
+											<button
+												onClick={() => openPurchaseDocument(regularPurchaseId, "license")}
+												className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
+											>
+												<FileText size={15} />
+												License
+											</button>
+
+											<button
+												onClick={() => openPurchaseDocument(regularPurchaseId, "receipt")}
+												className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
+											>
+												<Receipt size={15} />
+												Receipt
+											</button>
+										</>
+									)}
+								</div>
 							) : (
 								<button
 									onClick={() => handleBuyTrack("REGULAR")}
@@ -515,13 +552,35 @@ export default function TrackFeedItem({
 
 							{hasFullVersion &&
 								(fullOwned ? (
-									<button
-										onClick={() => handleDownloadTrack("FULL")}
-										className="flex items-center gap-2 rounded-full border border-[#4E3523] px-4 py-2 text-sm font-medium text-[#4E3523]"
-									>
-										<Download size={16} />
-										Full ZIP
-									</button>
+									<div className="flex flex-wrap items-center justify-end gap-2">
+										<button
+											onClick={() => handleDownloadTrack("FULL")}
+											className="flex items-center gap-2 rounded-full border border-[#4E3523] px-4 py-2 text-sm font-medium text-[#4E3523]"
+										>
+											<Download size={16} />
+											Full ZIP
+										</button>
+
+										{fullPurchaseId && (
+											<>
+												<button
+													onClick={() => openPurchaseDocument(fullPurchaseId, "license")}
+													className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
+												>
+													<FileText size={15} />
+													License
+												</button>
+
+												<button
+													onClick={() => openPurchaseDocument(fullPurchaseId, "receipt")}
+													className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
+												>
+													<Receipt size={15} />
+													Receipt
+												</button>
+											</>
+										)}
+									</div>
 								) : (
 									<button
 										onClick={() => handleBuyTrack("FULL")}
