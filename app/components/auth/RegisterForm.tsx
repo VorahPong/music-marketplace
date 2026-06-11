@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+// app/components/auth/RegisterForm.tsx
+
+type RegisterStep = "register" | "verify";
 
 export default function RegisterForm() {
 	const [name, setName] = useState("");
 	const [handle, setHandle] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const [code, setCode] = useState("");
+	const [step, setStep] = useState<RegisterStep>("register");
 
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
@@ -15,6 +20,7 @@ export default function RegisterForm() {
 
 	const [handleAvailable, setHandleAvailable] = useState<boolean | null>(null);
 	const [checkingHandle, setCheckingHandle] = useState(false);
+
 	useEffect(() => {
 		if (!handle.trim()) {
 			setHandleAvailable(null);
@@ -34,7 +40,7 @@ export default function RegisterForm() {
 			} finally {
 				setCheckingHandle(false);
 			}
-		}, 400); // debounce
+		}, 400);
 
 		return () => clearTimeout(timeout);
 	}, [handle]);
@@ -84,12 +90,22 @@ export default function RegisterForm() {
 				return;
 			}
 
+			if (data.requiresVerification) {
+				setStep("verify");
+				setSuccess(
+					data.message ||
+						"Account created successfully. Enter the 6-digit verification code.",
+				);
+				setPassword("");
+				return;
+			}
+
 			setSuccess("Account created successfully. Redirecting to login...");
 			setName("");
 			setHandle("");
 			setEmail("");
 			setPassword("");
-			// Redirect after 3 seconds
+
 			setTimeout(() => {
 				window.location.href = "/auth/login";
 			}, 2000);
@@ -98,6 +114,116 @@ export default function RegisterForm() {
 		} finally {
 			setLoading(false);
 		}
+	}
+
+	async function handleVerifyRegisterCode(e: React.FormEvent<HTMLFormElement>) {
+		e.preventDefault();
+		setError("");
+		setSuccess("");
+		setLoading(true);
+
+		try {
+			if (!email || !code) {
+				setError("Email and verification code are required.");
+				return;
+			}
+
+			if (!/^\d{6}$/.test(code)) {
+				setError("Verification code must be 6 digits.");
+				return;
+			}
+
+			const res = await fetch("/api/auth/verify-register-code", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					email,
+					code,
+				}),
+			});
+
+			const data = await res.json();
+
+			if (!res.ok) {
+				setError(data.error || "Verification failed. Please try again.");
+				return;
+			}
+
+			setSuccess(data.message || "Email verified successfully. Redirecting to login...");
+			setCode("");
+
+			setTimeout(() => {
+				window.location.href = "/auth/login";
+			}, 1500);
+		} catch {
+			setError("Verification failed. Please try again.");
+		} finally {
+			setLoading(false);
+		}
+	}
+
+	if (step === "verify") {
+		return (
+			<form onSubmit={handleVerifyRegisterCode} className="space-y-4">
+				<div>
+					<h2 className="text-xl font-semibold text-white">Verify your email</h2>
+					<p className="mt-2 text-sm text-zinc-400">
+						Enter the 6-digit code for {email}. For now, check your dev terminal
+						log.
+					</p>
+				</div>
+
+				<div>
+					<label className="mb-1 block text-sm text-zinc-300">Code</label>
+					<input
+						type="text"
+						value={code}
+						onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+						placeholder="123456"
+						className="w-full rounded-xl border border-zinc-700 bg-[#FAF8ED] px-4 py-3 text-sm text-black outline-none transition focus:border-zinc-500"
+						inputMode="numeric"
+						maxLength={6}
+						required
+					/>
+				</div>
+
+				{error && (
+					<div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+						{error}
+					</div>
+				)}
+
+				{success && (
+					<div className="rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+						{success}
+					</div>
+				)}
+
+				<button
+					type="submit"
+					disabled={loading}
+					className="w-full rounded-xl bg-white px-4 py-3 text-sm font-medium text-black transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+				>
+					{loading ? "Verifying..." : "Verify email"}
+				</button>
+
+				<button
+					type="button"
+					disabled={loading}
+					onClick={() => {
+						setStep("register");
+						setCode("");
+						setError("");
+						setSuccess("");
+					}}
+					className="w-full rounded-xl border border-zinc-700 px-4 py-3 text-sm font-medium text-zinc-200 transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
+				>
+					Back to register
+				</button>
+			</form>
+		);
 	}
 
 	return (
@@ -109,7 +235,7 @@ export default function RegisterForm() {
 					value={name}
 					onChange={(e) => setName(e.target.value)}
 					placeholder="Your name"
-					className="w-full rounded-xl border border-zinc-700 px-4 py-3 text-sm outline-none transition focus:border-zinc-500"
+					className="w-full rounded-xl border border-zinc-700 bg-[#FAF8ED] px-4 py-3 text-sm text-black outline-none transition focus:border-zinc-500"
 				/>
 			</div>
 
@@ -120,7 +246,7 @@ export default function RegisterForm() {
 					value={handle}
 					onChange={(e) => setHandle(e.target.value.toLowerCase())}
 					placeholder="yourusername"
-					className="w-full rounded-xl border border-zinc-700 px-4 py-3 text-sm outline-none transition focus:border-zinc-500"
+					className="w-full rounded-xl border border-zinc-700 bg-[#FAF8ED] px-4 py-3 text-sm text-black outline-none transition focus:border-zinc-500"
 					required
 				/>
 				{handle && checkingHandle && (
@@ -135,7 +261,7 @@ export default function RegisterForm() {
 					<p className="mt-1 text-xs text-red-400">✖ Handle is already taken</p>
 				)}
 				<p className="mt-1 text-xs text-zinc-500">
-					This will be your public URL (e.g. /channel/yourusername)
+					This will be your public URL (e.g. /main/channel/yourusername)
 				</p>
 			</div>
 
@@ -146,7 +272,7 @@ export default function RegisterForm() {
 					value={email}
 					onChange={(e) => setEmail(e.target.value)}
 					placeholder="you@example.com"
-					className="w-full rounded-xl border border-zinc-700 px-4 py-3 text-sm outline-none transition focus:border-zinc-500"
+					className="w-full rounded-xl border border-zinc-700 bg-[#FAF8ED] px-4 py-3 text-sm text-black outline-none transition focus:border-zinc-500"
 					required
 				/>
 			</div>
@@ -158,7 +284,7 @@ export default function RegisterForm() {
 					value={password}
 					onChange={(e) => setPassword(e.target.value)}
 					placeholder="Create a password"
-					className="w-full rounded-xl border border-zinc-700 px-4 py-3 text-sm outline-none transition focus:border-zinc-500"
+					className="w-full rounded-xl border border-zinc-700 bg-[#FAF8ED] px-4 py-3 text-sm text-black outline-none transition focus:border-zinc-500"
 					required
 				/>
 			</div>

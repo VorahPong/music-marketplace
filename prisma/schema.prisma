@@ -8,20 +8,23 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  name         String?
-  handle       String    @unique
-  email        String    @unique
-  passwordHash String
-  role         UserRole  @default(CUSTOMER)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  name              String?
+  handle            String    @unique
+  email             String    @unique
+  passwordHash      String
+  role              UserRole  @default(CUSTOMER)
+  emailVerifiedAt   DateTime?
+  twoFactorEnabled  Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  tracks       Track[]
-  sessions     Session[]
-  comments     Comment[]
-  likes        Like[]
-  purchases    TrackPurchase[]
+  tracks            Track[]
+  sessions          Session[]
+  authCodes         AuthCode[]
+  comments          Comment[]
+  likes             Like[]
+  purchases         TrackPurchase[]
 }
 
 model Track {
@@ -100,6 +103,21 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model AuthCode {
+  id        String          @id @default(cuid())
+  userId    String
+  codeHash  String
+  purpose   AuthCodePurpose
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime        @default(now())
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
 model Comment {
   id        String   @id @default(cuid())
   content   String
@@ -123,6 +141,11 @@ enum TrackType {
 enum UserRole {
   CUSTOMER
   SELLER
+}
+
+enum AuthCodePurpose {
+  REGISTER
+  LOGIN
 }
 
 enum PurchaseVersion {
