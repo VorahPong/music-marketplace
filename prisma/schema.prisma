@@ -146,6 +146,7 @@ enum UserRole {
 enum AuthCodePurpose {
   REGISTER
   LOGIN
+  RESET_PASSWORD
 }
 
 enum PurchaseVersion {
