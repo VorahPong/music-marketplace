@@ -3,6 +3,11 @@ import bcrypt from "bcrypt";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { sendVerificationCodeEmail } from "@/lib/email";
+import {
+	checkRateLimit,
+	createRateLimitKey,
+	rateLimitResponse,
+} from "@/lib/rateLimit";
 
 // app/api/register/route.ts
 
@@ -30,9 +35,19 @@ export async function POST(req: Request) {
 			);
 		}
 
-		if (password.length < 6) {
+		const registerRateLimit = checkRateLimit({
+			key: createRateLimitKey(req, "register", email),
+			limit: 5,
+			windowMs: 60 * 60 * 1000,
+		});
+
+		if (registerRateLimit.limited) {
+			return rateLimitResponse(registerRateLimit.retryAfterSeconds);
+		}
+
+		if (password.length < 8) {
 			return NextResponse.json(
-				{ error: "Password must be at least 6 characters." },
+				{ error: "Password must be at least 8 characters." },
 				{ status: 400 },
 			);
 		}

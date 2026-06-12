@@ -2,9 +2,17 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPayPalAccessToken } from "@/lib/paypal";
+import {
+	checkRateLimit,
+	createRateLimitKey,
+	rateLimitResponse,
+} from "@/lib/rateLimit";
 
 const PAYPAL_BASE_URL =
 	process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com";
+
+const TRACK_ID_PATTERN = /^[a-zA-Z0-9_-]{8,64}$/;
+const MAX_PRICE_CENTS = 100_000;
 
 export async function POST(req: Request) {
 	try {
@@ -14,6 +22,16 @@ export async function POST(req: Request) {
 			return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 		}
 
+		const createOrderRateLimit = checkRateLimit({
+			key: createRateLimitKey(req, "paypal-create-order", user.id),
+			limit: 20,
+			windowMs: 15 * 60 * 1000,
+		});
+
+		if (createOrderRateLimit.limited) {
+			return rateLimitResponse(createOrderRateLimit.retryAfterSeconds);
+		}
+
 		const body = await req.json();
 		const trackId = body.trackId as string | undefined;
 		const version = body.version as "REGULAR" | "FULL" | undefined;
@@ -21,6 +39,13 @@ export async function POST(req: Request) {
 		if (!trackId) {
 			return NextResponse.json(
 				{ error: "Track is required." },
+				{ status: 400 },
+			);
+		}
+
+		if (!TRACK_ID_PATTERN.test(trackId)) {
+			return NextResponse.json(
+				{ error: "Invalid track ID." },
 				{ status: 400 },
 			);
 		}
@@ -88,6 +113,13 @@ export async function POST(req: Request) {
 			);
 		}
 
+		if (!Number.isInteger(priceCents) || priceCents > MAX_PRICE_CENTS) {
+			return NextResponse.json(
+				{ error: "Invalid track price." },
+				{ status: 400 },
+			);
+		}
+
 		const existingPurchases = await prisma.trackPurchase.findMany({
 			where: {
 				userId: user.id,
@@ -118,6 +150,8 @@ export async function POST(req: Request) {
 				{ status: 400 },
 			);
 		}
+
+		const invoiceId = `${track.id.slice(-10)}-${user.id.slice(-10)}-${version}-${Date.now()}`;
 
 		const priceUsd = (priceCents / 100).toFixed(2);
 		const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -151,7 +185,7 @@ export async function POST(req: Request) {
 							version,
 							amountCents: priceCents,
 						}),
-						invoice_id: `${track.id}-${user.id}-${version}`,
+						invoice_id: invoiceId,
 					},
 				],
 			}),

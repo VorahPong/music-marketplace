@@ -3,6 +3,11 @@
 import bcrypt from "bcrypt";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {
+	checkRateLimit,
+	createRateLimitKey,
+	rateLimitResponse,
+} from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
 	try {
@@ -16,6 +21,16 @@ export async function POST(req: Request) {
 				{ error: "Email, code, and new password are required." },
 				{ status: 400 },
 			);
+		}
+
+		const rateLimit = checkRateLimit({
+			key: createRateLimitKey(req, "reset-password", email),
+			limit: 8,
+			windowMs: 15 * 60 * 1000,
+		});
+
+		if (rateLimit.limited) {
+			return rateLimitResponse(rateLimit.retryAfterSeconds);
 		}
 
 		if (!/^\d{6}$/.test(code)) {

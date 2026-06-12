@@ -5,6 +5,11 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendVerificationCodeEmail } from "@/lib/email";
+import {
+	checkRateLimit,
+	createRateLimitKey,
+	rateLimitResponse,
+} from "@/lib/rateLimit";
 
 function generateSixDigitCode() {
 	return crypto.randomInt(100000, 1000000).toString();
@@ -17,6 +22,16 @@ export async function POST(req: Request) {
 
 		if (!email) {
 			return NextResponse.json({ error: "Email is required." }, { status: 400 });
+		}
+
+		const rateLimit = checkRateLimit({
+			key: createRateLimitKey(req, "forgot-password", email),
+			limit: 5,
+			windowMs: 15 * 60 * 1000,
+		});
+
+		if (rateLimit.limited) {
+			return rateLimitResponse(rateLimit.retryAfterSeconds);
 		}
 
 		const safeMessage =
