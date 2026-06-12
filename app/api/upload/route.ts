@@ -56,7 +56,7 @@ function isZipFile(file: File) {
 	);
 }
 
-function isValidUploadedFile(file: File | null) {
+function isValidUploadedFile(file: File | null): file is File {
 	return file instanceof File && file.size > 0;
 }
 
