@@ -1,6 +1,3 @@
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
@@ -9,6 +6,7 @@ import {
 	createRateLimitKey,
 	rateLimitResponse,
 } from "@/lib/rateLimit";
+import { createStorageKey, uploadFileToStorage } from "@/lib/storage";
 // app/api/upload/route.ts
 export const runtime = "nodejs";
 
@@ -27,12 +25,8 @@ const ALLOWED_PREVIEW_TYPES = ["audio/mpeg"];
 const ALLOWED_WAV_TYPES = ["audio/wav", "audio/x-wav", "audio/wave"];
 const ALLOWED_ZIP_TYPES = ["application/zip", "application/x-zip-compressed"];
 
-function sanitizeFileName(fileName: string) {
-	return fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
-}
-
 function getFileExtension(fileName: string) {
-	return path.extname(fileName).toLowerCase();
+	return fileName.toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || "";
 }
 
 function isMp3File(file: File) {
@@ -70,22 +64,6 @@ function validatePriceCents(priceCents: number) {
 
 function canUploadTracks(role: string) {
 	return role === "SELLER" || role === "ADMIN";
-}
-
-async function saveFile(file: File, uploadDir: string) {
-	const bytes = await file.arrayBuffer();
-	const buffer = Buffer.from(bytes);
-
-	const originalName = sanitizeFileName(file.name);
-	const fileExtension = getFileExtension(originalName);
-	const uniqueFileName = `${uuidv4()}${fileExtension}`;
-
-	await mkdir(uploadDir, { recursive: true });
-
-	const fullFilePath = path.join(uploadDir, uniqueFileName);
-	await writeFile(fullFilePath, buffer);
-
-	return uniqueFileName;
 }
 
 export async function POST(req: Request) {
@@ -293,24 +271,37 @@ export async function POST(req: Request) {
 			}
 		}
 
-		const previewUploadDir = path.join(process.cwd(), "public", "uploads", "previews");
-		const regularUploadDir = path.join(process.cwd(), "storage", "protected", "regular");
-		const fullUploadDir = path.join(process.cwd(), "storage", "protected", "full");
+		const previewMp3Key = createStorageKey("previews", previewMp3File.name);
 
-		const previewFileName = await saveFile(previewMp3File, previewUploadDir);
-		const previewMp3Url = `/uploads/previews/${previewFileName}`;
+		await uploadFileToStorage({
+			key: previewMp3Key,
+			file: previewMp3File,
+			contentType: previewMp3File.type || "audio/mpeg",
+		});
+
+		const previewMp3Url = previewMp3Key;
 
 		let regularWavKey: string | null = null;
 		let fullZipKey: string | null = null;
 
 		if (isForSale && isValidUploadedFile(regularWavFile)) {
-			const regularFileName = await saveFile(regularWavFile, regularUploadDir);
-			regularWavKey = `storage/protected/regular/${regularFileName}`;
+			regularWavKey = createStorageKey("regular", regularWavFile.name);
+
+			await uploadFileToStorage({
+				key: regularWavKey,
+				file: regularWavFile,
+				contentType: regularWavFile.type || "audio/wav",
+			});
 		}
 
 		if (isForSale && isValidUploadedFile(fullZipFile)) {
-			const fullFileName = await saveFile(fullZipFile, fullUploadDir);
-			fullZipKey = `storage/protected/full/${fullFileName}`;
+			fullZipKey = createStorageKey("full", fullZipFile.name);
+
+			await uploadFileToStorage({
+				key: fullZipKey,
+				file: fullZipFile,
+				contentType: fullZipFile.type || "application/zip",
+			});
 		}
 
 		const track = await prisma.track.create({

@@ -1,11 +1,10 @@
 // do not remove
 // app/api/tracks/[trackId]/delete/route.ts
 
-import { promises as fs } from "fs";
-import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { deleteFileFromStorage } from "@/lib/storage";
 
 type DeleteTrackRouteContext = {
 	params: Promise<{
@@ -13,22 +12,27 @@ type DeleteTrackRouteContext = {
 	}>;
 };
 
+function isValidStorageKey(fileKey: string | null) {
+	if (!fileKey) return false;
+
+	if (fileKey.includes("..") || fileKey.startsWith("/") || fileKey.includes("\\")) {
+		return false;
+	}
+
+	return (
+		fileKey.startsWith("previews/") ||
+		fileKey.startsWith("regular/") ||
+		fileKey.startsWith("full/")
+	);
+}
+
 async function deleteFileIfSafe(fileKey: string | null) {
-	if (!fileKey) return;
-
-	const storageRoot = path.join(process.cwd(), "storage");
-	const publicUploadsRoot = path.join(process.cwd(), "public", "uploads");
-	const requestedPath = path.join(process.cwd(), fileKey);
-
-	const isProtectedFile = requestedPath.startsWith(storageRoot);
-	const isPublicUpload = requestedPath.startsWith(publicUploadsRoot);
-
-	if (!isProtectedFile && !isPublicUpload) return;
+	if (!isValidStorageKey(fileKey)) return;
 
 	try {
-		await fs.unlink(requestedPath);
+		await deleteFileFromStorage(fileKey);
 	} catch (error) {
-		console.warn(`Could not delete file: ${fileKey}`, error);
+		console.warn(`Could not delete file from storage: ${fileKey}`, error);
 	}
 }
 
@@ -67,7 +71,9 @@ export async function DELETE(
 			return NextResponse.json({ error: "Track not found" }, { status: 404 });
 		}
 
-		if (track.ownerId !== user.id) {
+		const canDeleteTrack = track.ownerId === user.id || user.role === "ADMIN";
+
+		if (!canDeleteTrack) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 

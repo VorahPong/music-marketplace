@@ -76,6 +76,12 @@ export default function CreatePageClient({
 	const [uploadedUrl, setUploadedUrl] = useState(
 		initialTrack?.previewMp3Url ?? "",
 	);
+	const [uploadedTrackId, setUploadedTrackId] = useState(initialTrack?.id ?? "");
+
+	const previewPlaybackUrl =
+		uploadedUrl?.startsWith("previews/") && uploadedTrackId
+			? `/api/tracks/${uploadedTrackId}/preview`
+			: uploadedUrl;
 
 	function handlePreviewMp3Change(e: React.ChangeEvent<HTMLInputElement>) {
 		const selected = e.target.files?.[0];
@@ -244,6 +250,7 @@ export default function CreatePageClient({
 			setSuccess(
 				isEditMode ? "Track updated successfully." : "Upload successful.",
 			);
+			setUploadedTrackId(data.data?.id || uploadedTrackId);
 			setUploadedUrl(
 				data.data?.previewMp3Url || data.data?.fileUrl || uploadedUrl,
 			);
@@ -604,13 +611,13 @@ export default function CreatePageClient({
 					)}
 				</form>
 
-				{uploadedUrl && (
+				{previewPlaybackUrl && (
 					<div className="mt-6 rounded-xl border border-[#D6CFC7] bg-white p-4">
 						<p className="text-sm font-medium">
 							{isEditMode ? "Current preview:" : "Uploaded preview:"}
 						</p>
 						<a
-							href={uploadedUrl}
+							href={previewPlaybackUrl}
 							target="_blank"
 							rel="noreferrer"
 							className="mt-2 inline-block text-sm text-blue-600 underline"
@@ -618,7 +625,7 @@ export default function CreatePageClient({
 							Open preview audio
 						</a>
 						<audio controls className="mt-4 w-full">
-							<source src={uploadedUrl} />
+							<source src={previewPlaybackUrl} />
 							Your browser does not support audio playback.
 						</audio>
 					</div>

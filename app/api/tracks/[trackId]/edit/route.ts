@@ -1,12 +1,11 @@
 // do not remove
 // app/api/tracks/[trackId]/edit/route.ts
 
-import { promises as fs } from "fs";
-import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { TrackType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createStorageKey, deleteFileFromStorage, uploadFileToStorage } from "@/lib/storage";
 
 type EditTrackRouteContext = {
 	params: Promise<{
@@ -20,6 +19,15 @@ const VALID_TRACK_TYPES = [
 	TrackType.LOOP,
 	TrackType.DRUMKIT,
 ] as const;
+
+const MAX_TITLE_LENGTH = 120;
+const MAX_DESCRIPTION_LENGTH = 2000;
+const MAX_TIME_SIGNATURE_LENGTH = 20;
+const MAX_MUSICAL_KEY_LENGTH = 40;
+const MAX_PRICE_CENTS = 100_000;
+const MAX_PREVIEW_MP3_SIZE = 20 * 1024 * 1024;
+const MAX_REGULAR_WAV_SIZE = 250 * 1024 * 1024;
+const MAX_FULL_ZIP_SIZE = 1024 * 1024 * 1024;
 
 function parseUsdToCents(value: FormDataEntryValue | null) {
 	if (typeof value !== "string" || !value.trim()) return null;
@@ -43,44 +51,55 @@ function getOptionalFile(value: FormDataEntryValue | null) {
 	return value;
 }
 
-function makeSafeFileName(file: File) {
-	const fileExtension = path.extname(file.name).toLowerCase();
-	const baseName = path
-		.basename(file.name, fileExtension)
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/(^-|-$)/g, "") || "track";
 
-	return `${Date.now()}-${crypto.randomUUID()}-${baseName}${fileExtension}`;
+function getFileExtension(fileName: string) {
+	return fileName.toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || "";
 }
 
-async function saveFile(file: File, folderPath: string) {
-	await fs.mkdir(folderPath, { recursive: true });
-
-	const fileName = makeSafeFileName(file);
-	const filePath = path.join(folderPath, fileName);
-	const arrayBuffer = await file.arrayBuffer();
-
-	await fs.writeFile(filePath, Buffer.from(arrayBuffer));
-
-	return fileName;
+function isFileTooLarge(file: File, maxSize: number) {
+	return file.size > maxSize;
 }
+
+function isValidStorageKey(fileKey: string | null) {
+	if (!fileKey) return false;
+
+	if (fileKey.includes("..") || fileKey.startsWith("/") || fileKey.includes("\\")) {
+		return false;
+	}
+
+	return (
+		fileKey.startsWith("previews/") ||
+		fileKey.startsWith("regular/") ||
+		fileKey.startsWith("full/")
+	);
+}
+
+async function deleteOldStorageFile(fileKey: string | null) {
+	if (!isValidStorageKey(fileKey)) return;
+
+	try {
+		await deleteFileFromStorage(fileKey);
+	} catch (error) {
+		console.warn(`Could not delete old storage file: ${fileKey}`, error);
+	}
+}
+
 
 function isMp3(file: File) {
-	return file.type === "audio/mpeg" || file.name.toLowerCase().endsWith(".mp3");
+	return file.type === "audio/mpeg" && getFileExtension(file.name) === ".mp3";
 }
 
 function isWav(file: File) {
 	return (
-		["audio/wav", "audio/x-wav", "audio/wave"].includes(file.type) ||
-		file.name.toLowerCase().endsWith(".wav")
+		["audio/wav", "audio/x-wav", "audio/wave"].includes(file.type) &&
+		getFileExtension(file.name) === ".wav"
 	);
 }
 
 function isZip(file: File) {
 	return (
-		["application/zip", "application/x-zip-compressed"].includes(file.type) ||
-		file.name.toLowerCase().endsWith(".zip")
+		["application/zip", "application/x-zip-compressed"].includes(file.type) &&
+		getFileExtension(file.name) === ".zip"
 	);
 }
 
@@ -111,8 +130,9 @@ export async function PATCH(
 		if (!existingTrack) {
 			return NextResponse.json({ error: "Track not found" }, { status: 404 });
 		}
+		const canEditTrack = existingTrack.ownerId === user.id || user.role === "ADMIN";
 
-		if (existingTrack.ownerId !== user.id) {
+		if (!canEditTrack) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 
@@ -134,6 +154,34 @@ export async function PATCH(
 
 		if (!title) {
 			return NextResponse.json({ error: "Title is required" }, { status: 400 });
+		}
+
+		if (title.length > MAX_TITLE_LENGTH) {
+			return NextResponse.json(
+				{ error: `Title must be ${MAX_TITLE_LENGTH} characters or fewer.` },
+				{ status: 400 },
+			);
+		}
+
+		if (description && description.length > MAX_DESCRIPTION_LENGTH) {
+			return NextResponse.json(
+				{ error: `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.` },
+				{ status: 400 },
+			);
+		}
+
+		if (timeSignature && timeSignature.length > MAX_TIME_SIGNATURE_LENGTH) {
+			return NextResponse.json(
+				{ error: `Time signature must be ${MAX_TIME_SIGNATURE_LENGTH} characters or fewer.` },
+				{ status: 400 },
+			);
+		}
+
+		if (musicalKey && musicalKey.length > MAX_MUSICAL_KEY_LENGTH) {
+			return NextResponse.json(
+				{ error: `Musical key must be ${MAX_MUSICAL_KEY_LENGTH} characters or fewer.` },
+				{ status: 400 },
+			);
 		}
 
 		const parsedTrackType = trackType as TrackType | null;
@@ -161,6 +209,13 @@ export async function PATCH(
 			);
 		}
 
+		if (previewMp3File && isFileTooLarge(previewMp3File, MAX_PREVIEW_MP3_SIZE)) {
+			return NextResponse.json(
+				{ error: "Preview MP3 must be 20 MB or smaller." },
+				{ status: 400 },
+			);
+		}
+
 		if (regularWavFile && !isWav(regularWavFile)) {
 			return NextResponse.json(
 				{ error: "Regular version must be a WAV file" },
@@ -168,9 +223,23 @@ export async function PATCH(
 			);
 		}
 
+		if (regularWavFile && isFileTooLarge(regularWavFile, MAX_REGULAR_WAV_SIZE)) {
+			return NextResponse.json(
+				{ error: "Regular WAV file must be 250 MB or smaller." },
+				{ status: 400 },
+			);
+		}
+
 		if (fullZipFile && !isZip(fullZipFile)) {
 			return NextResponse.json(
 				{ error: "Full version must be a ZIP file" },
+				{ status: 400 },
+			);
+		}
+
+		if (fullZipFile && isFileTooLarge(fullZipFile, MAX_FULL_ZIP_SIZE)) {
+			return NextResponse.json(
+				{ error: "Full ZIP file must be 1 GB or smaller." },
 				{ status: 400 },
 			);
 		}
@@ -192,53 +261,71 @@ export async function PATCH(
 				);
 			}
 
+			if (regularPriceCents > MAX_PRICE_CENTS) {
+				return NextResponse.json(
+					{ error: "Regular price must be between $0.01 and $1,000." },
+					{ status: 400 },
+				);
+			}
+
 			if ((existingTrack.fullZipKey || fullZipFile) && !fullPriceCents) {
 				return NextResponse.json(
 					{ error: "Full price is required when a full ZIP exists" },
 					{ status: 400 },
 				);
 			}
-		}
 
-		const publicPreviewFolder = path.join(
-			process.cwd(),
-			"public",
-			"uploads",
-			"previews",
-		);
-		const protectedRegularFolder = path.join(
-			process.cwd(),
-			"storage",
-			"protected",
-			"regular",
-		);
-		const protectedFullFolder = path.join(
-			process.cwd(),
-			"storage",
-			"protected",
-			"full",
-		);
+			if (fullPriceCents && fullPriceCents > MAX_PRICE_CENTS) {
+				return NextResponse.json(
+					{ error: "Full version price must be between $0.01 and $1,000." },
+					{ status: 400 },
+				);
+			}
+		}
 
 		let previewMp3Url: string | undefined;
 		let regularWavKey: string | null | undefined;
 		let fullZipKey: string | null | undefined;
 
 		if (previewMp3File) {
-			const savedPreviewName = await saveFile(previewMp3File, publicPreviewFolder);
-			previewMp3Url = `/uploads/previews/${savedPreviewName}`;
+			previewMp3Url = createStorageKey("previews", previewMp3File.name);
+
+			await uploadFileToStorage({
+				key: previewMp3Url,
+				file: previewMp3File,
+				contentType: previewMp3File.type || "audio/mpeg",
+			});
+
+			await deleteOldStorageFile(existingTrack.previewMp3Url);
 		}
 
 		if (isForSale && regularWavFile) {
-			const savedRegularName = await saveFile(regularWavFile, protectedRegularFolder);
-			regularWavKey = `storage/protected/regular/${savedRegularName}`;
+			regularWavKey = createStorageKey("regular", regularWavFile.name);
+
+			await uploadFileToStorage({
+				key: regularWavKey,
+				file: regularWavFile,
+				contentType: regularWavFile.type || "audio/wav",
+			});
+
+			await deleteOldStorageFile(existingTrack.regularWavKey);
 		}
 
 		if (isForSale && fullZipFile) {
-			const savedFullName = await saveFile(fullZipFile, protectedFullFolder);
-			fullZipKey = `storage/protected/full/${savedFullName}`;
+			fullZipKey = createStorageKey("full", fullZipFile.name);
+
+			await uploadFileToStorage({
+				key: fullZipKey,
+				file: fullZipFile,
+				contentType: fullZipFile.type || "application/zip",
+			});
+
+			await deleteOldStorageFile(existingTrack.fullZipKey);
 		}
 
 		if (!isForSale) {
+			await deleteOldStorageFile(existingTrack.regularWavKey);
+			await deleteOldStorageFile(existingTrack.fullZipKey);
 			regularWavKey = null;
 			fullZipKey = null;
 		}

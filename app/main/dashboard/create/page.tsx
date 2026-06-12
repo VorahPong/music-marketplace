@@ -6,10 +6,10 @@ export default async function CreatePage() {
 	const user = await getCurrentUser();
 
 	if (!user) {
-
 		redirect("/auth/login");
 	}
-	if (user.role !== "SELLER") {
+
+	if (user.role !== "SELLER" && user.role !== "ADMIN") {
 		redirect("/main");
 	}
 
