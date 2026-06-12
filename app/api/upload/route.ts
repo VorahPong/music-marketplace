@@ -68,6 +68,10 @@ function validatePriceCents(priceCents: number) {
 	return Number.isInteger(priceCents) && priceCents > 0 && priceCents <= MAX_PRICE_CENTS;
 }
 
+function canUploadTracks(role: string) {
+	return role === "SELLER" || role === "ADMIN";
+}
+
 async function saveFile(file: File, uploadDir: string) {
 	const bytes = await file.arrayBuffer();
 	const buffer = Buffer.from(bytes);
@@ -92,9 +96,9 @@ export async function POST(req: Request) {
 			return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 		}
 
-		if (user.role !== "SELLER") {
+		if (!canUploadTracks(user.role)) {
 			return NextResponse.json(
-				{ error: "Only sellers can upload tracks." },
+				{ error: "Only sellers and admins can upload tracks." },
 				{ status: 403 },
 			);
 		}
@@ -299,12 +303,12 @@ export async function POST(req: Request) {
 		let regularWavKey: string | null = null;
 		let fullZipKey: string | null = null;
 
-		if (isForSale && regularWavFile) {
+		if (isForSale && isValidUploadedFile(regularWavFile)) {
 			const regularFileName = await saveFile(regularWavFile, regularUploadDir);
 			regularWavKey = `storage/protected/regular/${regularFileName}`;
 		}
 
-		if (isForSale && fullZipFile) {
+		if (isForSale && isValidUploadedFile(fullZipFile)) {
 			const fullFileName = await saveFile(fullZipFile, fullUploadDir);
 			fullZipKey = `storage/protected/full/${fullFileName}`;
 		}

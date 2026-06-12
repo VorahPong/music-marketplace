@@ -10,6 +10,7 @@ import {
 	Settings,
 	User,
 	Coins,
+	BarChart3,
 } from "lucide-react";
 import Sidebar from "./SideBar";
 import Link from "next/link";
@@ -131,7 +132,7 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 				</form>
 
 				<div className="flex items-center gap-4">
-					{user?.role === "SELLER" && (
+					{(user?.role === "SELLER" || user?.role === "ADMIN") && (
 						<Link href="/main/dashboard/create">
 							<button className="flex items-center gap-2 rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523] hover:opacity-90">
 								<Plus size={16} />
@@ -196,6 +197,17 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 										<Settings size={16} />
 										Settings
 									</Link>
+
+									{user?.role === "ADMIN" && (
+										<Link
+											href="/main/admin"
+											className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
+											onClick={() => setIsProfileOpen(false)}
+										>
+											<BarChart3 size={16} />
+											Admin Analytics
+										</Link>
+									)}
 
 									<button
 										className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
