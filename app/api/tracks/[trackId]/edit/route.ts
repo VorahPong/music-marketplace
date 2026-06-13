@@ -60,7 +60,7 @@ function isFileTooLarge(file: File, maxSize: number) {
 	return file.size > maxSize;
 }
 
-function isValidStorageKey(fileKey: string | null) {
+function isValidStorageKey(fileKey: string | null): fileKey is string {
 	if (!fileKey) return false;
 
 	if (fileKey.includes("..") || fileKey.startsWith("/") || fileKey.includes("\\")) {
