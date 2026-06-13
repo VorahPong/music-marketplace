@@ -6,6 +6,11 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth";
+import {
+	checkRateLimit,
+	createRateLimitKey,
+	rateLimitResponse,
+} from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
 	try {
@@ -20,6 +25,16 @@ export async function POST(req: Request) {
 				{ error: "Email and verification code are required." },
 				{ status: 400 },
 			);
+		}
+
+		const verifyLoginRateLimit = checkRateLimit({
+			key: createRateLimitKey(req, "verify-login-code", email),
+			limit: 8,
+			windowMs: 15 * 60 * 1000,
+		});
+
+		if (verifyLoginRateLimit.limited) {
+			return rateLimitResponse(verifyLoginRateLimit.retryAfterSeconds);
 		}
 
 		if (!/^\d{6}$/.test(code)) {

@@ -3,6 +3,11 @@
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth";
 import { sendVerificationCodeEmail } from "@/lib/email";
+import {
+	checkRateLimit,
+	createRateLimitKey,
+	rateLimitResponse,
+} from "@/lib/rateLimit";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { cookies } from "next/headers";
@@ -61,6 +66,16 @@ export async function POST(req: Request) {
 			);
 		}
 
+		const loginRateLimit = checkRateLimit({
+			key: createRateLimitKey(req, "login", email),
+			limit: 10,
+			windowMs: 15 * 60 * 1000,
+		});
+
+		if (loginRateLimit.limited) {
+			return rateLimitResponse(loginRateLimit.retryAfterSeconds);
+		}
+
 		const user = await prisma.user.findUnique({
 			where: { email },
 			select: {
@@ -104,6 +119,16 @@ export async function POST(req: Request) {
 		}
 
 		if (user.twoFactorEnabled) {
+			const loginCodeRateLimit = checkRateLimit({
+				key: createRateLimitKey(req, "login-code", user.email),
+				limit: 5,
+				windowMs: 15 * 60 * 1000,
+			});
+
+			if (loginCodeRateLimit.limited) {
+				return rateLimitResponse(loginCodeRateLimit.retryAfterSeconds);
+			}
+
 			await createLoginCode(user.id, user.email);
 
 			return NextResponse.json(

@@ -9,7 +9,7 @@ const smtpUser = process.env.SMTP_USER;
 const smtpPass = process.env.SMTP_PASS;
 const emailFrom = process.env.EMAIL_FROM || smtpUser;
 
-type VerificationPurpose = "REGISTER" | "LOGIN";
+type VerificationPurpose = "REGISTER" | "LOGIN" | "RESET_PASSWORD";
 
 type SendVerificationCodeEmailParams = {
 	to: string;
@@ -36,16 +36,33 @@ function getTransporter() {
 }
 
 function getEmailContent(purpose: VerificationPurpose, code: string) {
-	const isRegister = purpose === "REGISTER";
-	const subject = isRegister
-		? "Verify your Music Marketplace account"
-		: "Your Music Marketplace login code";
-	const title = isRegister ? "Verify your account" : "Complete your login";
-	const message = isRegister
-		? "Use this code to verify your email address."
-		: "Use this code to finish logging in.";
+	const contentByPurpose: Record<
+		VerificationPurpose,
+		{ subject: string; title: string; message: string; codeLabel: string }
+	> = {
+		REGISTER: {
+			subject: "Verify your Music Marketplace account",
+			title: "Verify your account",
+			message: "Use this code to verify your email address.",
+			codeLabel: "Verification Code",
+		},
+		LOGIN: {
+			subject: "Your Music Marketplace login code",
+			title: "Complete your login",
+			message: "Use this code to finish logging in.",
+			codeLabel: "Login Code",
+		},
+		RESET_PASSWORD: {
+			subject: "Reset your Music Marketplace password",
+			title: "Reset your password",
+			message: "Use this code to reset your password.",
+			codeLabel: "Password Reset Code",
+		},
+	};
 
-	const text = `${message}\n\nYour verification code is: ${code}\n\nThis code expires in 10 minutes. If you did not request this, you can ignore this email.`;
+	const { subject, title, message, codeLabel } = contentByPurpose[purpose];
+
+	const text = `${message}\n\nYour code is: ${code}\n\nThis code expires in 10 minutes. If you did not request this, you can ignore this email.`;
 
 	const html = `
 		<div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #4E3523;">
@@ -54,7 +71,7 @@ function getEmailContent(purpose: VerificationPurpose, code: string) {
 				<p style="margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #4E3523;">${message}</p>
 
 				<div style="background: #ffffff; border: 1px solid #D6CFC7; border-radius: 18px; padding: 20px; text-align: center;">
-					<p style="margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(78, 53, 35, 0.6);">Verification Code</p>
+					<p style="margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(78, 53, 35, 0.6);">${codeLabel}</p>
 					<div style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #4E3523;">${code}</div>
 				</div>
 

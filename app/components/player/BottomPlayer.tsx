@@ -12,7 +12,7 @@ function formatTime(seconds: number) {
 
 	return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
-
+// app/components/player/BottomPlayer.tsx
 export default function BottomPlayer() {
 	const {
 		currentTrack,

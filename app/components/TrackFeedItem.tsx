@@ -75,7 +75,9 @@ export default function TrackFeedItem({
 
 	const artistName = track.owner?.name || "Unknown Artist";
 
-	const previewUrl = track.previewMp3Url;
+	const previewUrl = track.previewMp3Url?.startsWith("previews/")
+		? `/api/tracks/${track.id}/preview`
+		: track.previewMp3Url;
 	const isRegularOwned = track.isRegularOwned ?? track.isOwned ?? false;
 	const isFullOwned = track.isFullOwned ?? false;
 	const regularPurchaseId = track.regularPurchaseId ?? null;
@@ -520,7 +522,9 @@ export default function TrackFeedItem({
 									{regularPurchaseId && (
 										<>
 											<button
-												onClick={() => openPurchaseDocument(regularPurchaseId, "license")}
+												onClick={() =>
+													openPurchaseDocument(regularPurchaseId, "license")
+												}
 												className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
 											>
 												<FileText size={15} />
@@ -528,7 +532,9 @@ export default function TrackFeedItem({
 											</button>
 
 											<button
-												onClick={() => openPurchaseDocument(regularPurchaseId, "receipt")}
+												onClick={() =>
+													openPurchaseDocument(regularPurchaseId, "receipt")
+												}
 												className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
 											>
 												<Receipt size={15} />
@@ -564,7 +570,9 @@ export default function TrackFeedItem({
 										{fullPurchaseId && (
 											<>
 												<button
-													onClick={() => openPurchaseDocument(fullPurchaseId, "license")}
+													onClick={() =>
+														openPurchaseDocument(fullPurchaseId, "license")
+													}
 													className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
 												>
 													<FileText size={15} />
@@ -572,7 +580,9 @@ export default function TrackFeedItem({
 												</button>
 
 												<button
-													onClick={() => openPurchaseDocument(fullPurchaseId, "receipt")}
+													onClick={() =>
+														openPurchaseDocument(fullPurchaseId, "receipt")
+													}
 													className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
 												>
 													<Receipt size={15} />

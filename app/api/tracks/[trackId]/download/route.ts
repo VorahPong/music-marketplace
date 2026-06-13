@@ -1,7 +1,6 @@
-import { readFile } from "fs/promises";
-import path from "path";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { getFileFromStorage } from "@/lib/storage";
 import { NextResponse } from "next/server";
 
 // app/api/tracks/[trackId]/download/route.ts
@@ -14,23 +13,22 @@ type RouteProps = {
 
 type DownloadVersion = "REGULAR" | "FULL";
 
-function getSafeStoragePath(fileKey: string) {
-	const storageRoot = path.join(process.cwd(), "storage");
-	const requestedPath = path.join(process.cwd(), fileKey);
-
-	if (!requestedPath.startsWith(storageRoot)) {
-		throw new Error("INVALID_FILE_PATH");
-	}
-
-	return requestedPath;
-}
-
 function sanitizeDownloadName(fileName: string) {
 	return fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
 }
 
 function getContentType(version: DownloadVersion) {
 	return version === "REGULAR" ? "audio/wav" : "application/zip";
+}
+
+function isValidStorageKey(fileKey: string, version: DownloadVersion) {
+	if (fileKey.includes("..") || fileKey.startsWith("/") || fileKey.includes("\\")) {
+		return false;
+	}
+
+	return version === "REGULAR"
+		? fileKey.startsWith("regular/")
+		: fileKey.startsWith("full/");
 }
 
 export async function GET(req: Request, { params }: RouteProps) {
@@ -123,28 +121,37 @@ export async function GET(req: Request, { params }: RouteProps) {
 			}
 		}
 
-		const safeFilePath = getSafeStoragePath(fileKey);
-		const fileBuffer = await readFile(safeFilePath);
+		if (!isValidStorageKey(fileKey, version)) {
+			return NextResponse.json(
+				{ error: "Invalid file storage key." },
+				{ status: 400 },
+			);
+		}
+
+		const storageFile = await getFileFromStorage(fileKey);
+		const fileBytes = await storageFile.Body?.transformToByteArray();
+
+		if (!fileBytes) {
+			return NextResponse.json(
+				{ error: "File could not be loaded." },
+				{ status: 404 },
+			);
+		}
+
+		const fileBuffer = Buffer.from(fileBytes);
 		const extension = version === "REGULAR" ? "wav" : "zip";
 		const downloadName = sanitizeDownloadName(`${track.title}-${version.toLowerCase()}.${extension}`);
 
 		return new NextResponse(fileBuffer, {
 			status: 200,
 			headers: {
-				"Content-Type": getContentType(version),
+				"Content-Type": storageFile.ContentType || getContentType(version),
 				"Content-Disposition": `attachment; filename="${downloadName}"`,
-				"Content-Length": String(fileBuffer.length),
+				"Content-Length": String(storageFile.ContentLength ?? fileBuffer.length),
 			},
 		});
 	} catch (error) {
 		console.error("Download route error:", error);
-
-		if (error instanceof Error && error.message === "INVALID_FILE_PATH") {
-			return NextResponse.json(
-				{ error: "Invalid file path." },
-				{ status: 400 },
-			);
-		}
 
 		return NextResponse.json(
 			{ error: "Something went wrong." },

@@ -2,10 +2,17 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPayPalAccessToken } from "@/lib/paypal";
+import {
+	checkRateLimit,
+	createRateLimitKey,
+	rateLimitResponse,
+} from "@/lib/rateLimit";
 // do not remove
 // app/api/paypal/capture-order/route.ts
 const PAYPAL_BASE_URL =
 	process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com";
+
+const PAYPAL_ORDER_ID_PATTERN = /^[A-Z0-9-]{8,64}$/;
 
 type PayPalCustomId = {
 	userId: string;
@@ -26,6 +33,23 @@ function createReceiptNumber({
 	return `RCPT-${trackId.slice(-8).toUpperCase()}-${userId.slice(-8).toUpperCase()}-${version}`;
 }
 
+function getCaptureAmountCents(capture: any) {
+	const value = capture?.amount?.value;
+	const currencyCode = capture?.amount?.currency_code;
+
+	if (currencyCode !== "USD" || typeof value !== "string") {
+		return null;
+	}
+
+	const amount = Number(value);
+
+	if (Number.isNaN(amount) || amount <= 0) {
+		return null;
+	}
+
+	return Math.round(amount * 100);
+}
+
 export async function POST(req: Request) {
 	try {
 		const user = await getCurrentUser();
@@ -34,12 +58,29 @@ export async function POST(req: Request) {
 			return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 		}
 
+		const captureRateLimit = checkRateLimit({
+			key: createRateLimitKey(req, "paypal-capture", user.id),
+			limit: 20,
+			windowMs: 15 * 60 * 1000,
+		});
+
+		if (captureRateLimit.limited) {
+			return rateLimitResponse(captureRateLimit.retryAfterSeconds);
+		}
+
 		const body = await req.json();
 		const orderId = body.orderId as string | undefined;
 
 		if (!orderId) {
 			return NextResponse.json(
 				{ error: "Order ID is required." },
+				{ status: 400 },
+			);
+		}
+
+		if (!PAYPAL_ORDER_ID_PATTERN.test(orderId)) {
+			return NextResponse.json(
+				{ error: "Invalid PayPal order ID." },
 				{ status: 400 },
 			);
 		}
@@ -74,14 +115,30 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const capture = data.purchase_units?.[0]?.payments?.captures?.[0];
+		const purchaseUnit = data.purchase_units?.[0];
+		const capture = purchaseUnit?.payments?.captures?.[0];
 		const customIdRaw = capture?.custom_id;
 		const paypalOrderId = data.id || orderId;
 		const paypalCaptureId = capture?.id ?? null;
+		const capturedAmountCents = getCaptureAmountCents(capture);
 
 		if (!customIdRaw) {
 			return NextResponse.json(
 				{ error: "Missing PayPal order metadata." },
+				{ status: 400 },
+			);
+		}
+
+		if (!paypalCaptureId) {
+			return NextResponse.json(
+				{ error: "Missing PayPal capture ID." },
+				{ status: 400 },
+			);
+		}
+
+		if (!capturedAmountCents) {
+			return NextResponse.json(
+				{ error: "Invalid PayPal capture amount." },
 				{ status: 400 },
 			);
 		}
@@ -111,11 +168,36 @@ export async function POST(req: Request) {
 			);
 		}
 
+		if (!customId.trackId || !Number.isInteger(customId.amountCents) || customId.amountCents <= 0) {
+			return NextResponse.json(
+				{ error: "Invalid PayPal order metadata." },
+				{ status: 400 },
+			);
+		}
+
+		const existingCapture = await prisma.trackPurchase.findFirst({
+			where: {
+				paypalCaptureId,
+			},
+			select: {
+				id: true,
+			},
+		});
+
+		if (existingCapture) {
+			return NextResponse.json(
+				{ error: "This PayPal capture has already been processed." },
+				{ status: 409 },
+			);
+		}
+
 		const track = await prisma.track.findUnique({
 			where: { id: customId.trackId },
 			select: {
 				id: true,
 				isForSale: true,
+				isPublished: true,
+				deletedAt: true,
 				ownerId: true,
 				regularWavKey: true,
 				fullZipKey: true,
@@ -145,6 +227,13 @@ export async function POST(req: Request) {
 			);
 		}
 
+		if (!track.isPublished || track.deletedAt) {
+			return NextResponse.json(
+				{ error: "This track is not available for purchase." },
+				{ status: 400 },
+			);
+		}
+
 		const expectedPriceCents =
 			customId.version === "REGULAR"
 				? track.regularPriceCents
@@ -162,6 +251,13 @@ export async function POST(req: Request) {
 		if (customId.amountCents !== expectedPriceCents) {
 			return NextResponse.json(
 				{ error: "PayPal order amount does not match the current track price." },
+				{ status: 400 },
+			);
+		}
+
+		if (capturedAmountCents !== expectedPriceCents) {
+			return NextResponse.json(
+				{ error: "Captured PayPal amount does not match the current track price." },
 				{ status: 400 },
 			);
 		}
