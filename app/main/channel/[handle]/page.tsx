@@ -1,7 +1,9 @@
+import TrackFeedItem from "@/app/components/TrackFeedItem";
+import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
-
+// do not remove
+// app/main/channel/[handle]/page.tsx
 type ChannelPageProps = {
 	params: Promise<{
 		handle: string;
@@ -18,8 +20,43 @@ export default async function ChannelPage({ params }: ChannelPageProps) {
 		},
 		include: {
 			tracks: {
+				where: {
+					isPublished: true,
+					deletedAt: null,
+				},
 				orderBy: {
 					createdAt: "desc",
+				},
+				include: {
+					owner: {
+						select: {
+							name: true,
+							handle: true,
+						},
+					},
+					likes: {
+						where: {
+							userId: currentUser?.id ?? "__guest__",
+						},
+						select: {
+							id: true,
+						},
+					},
+					purchases: {
+						where: {
+							userId: currentUser?.id ?? "__guest__",
+						},
+						select: {
+							id: true,
+							version: true,
+						},
+					},
+					_count: {
+						select: {
+							likes: true,
+							comments: true,
+						},
+					},
 				},
 			},
 		},
@@ -30,6 +67,26 @@ export default async function ChannelPage({ params }: ChannelPageProps) {
 	}
 
 	const isOwnChannel = currentUser?.id === channelUser.id;
+	const tracks = channelUser.tracks.map((track) => {
+		const regularPurchase = track.purchases.find(
+			(purchase) => purchase.version === "REGULAR",
+		);
+		const fullPurchase = track.purchases.find(
+			(purchase) => purchase.version === "FULL",
+		);
+
+		return {
+			...track,
+			likesCount: track._count.likes,
+			commentCount: track._count.comments,
+			isLiked: track.likes.length > 0,
+			isOwner: currentUser?.id === track.ownerId,
+			isRegularOwned: Boolean(regularPurchase || fullPurchase),
+			isFullOwned: Boolean(fullPurchase),
+			regularPurchaseId: regularPurchase?.id ?? fullPurchase?.id ?? null,
+			fullPurchaseId: fullPurchase?.id ?? null,
+		};
+	});
 
 	return (
 		<div className="min-h-screen bg-[#FAF8ED] text-[#4E3523]">
@@ -55,8 +112,8 @@ export default async function ChannelPage({ params }: ChannelPageProps) {
 										{channelUser.email}
 									</p>
 									<p className="mt-2 text-sm text-[#4E3523]/70">
-										{channelUser.tracks.length} track
-										{channelUser.tracks.length !== 1 ? "s" : ""}
+										{tracks.length} track
+										{tracks.length !== 1 ? "s" : ""}
 									</p>
 								</div>
 							</div>
@@ -72,7 +129,7 @@ export default async function ChannelPage({ params }: ChannelPageProps) {
 					<div className="mt-8">
 						<h2 className="text-2xl font-semibold">Uploaded Music</h2>
 
-						{channelUser.tracks.length === 0 ? (
+						{tracks.length === 0 ? (
 							<div className="mt-6 rounded-2xl border border-[#D6CFC7] bg-white p-6 text-center">
 								<p className="text-lg font-medium">No tracks uploaded yet</p>
 								<p className="mt-2 text-sm text-[#4E3523]/70">
@@ -80,40 +137,13 @@ export default async function ChannelPage({ params }: ChannelPageProps) {
 								</p>
 							</div>
 						) : (
-							<div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-								{channelUser.tracks.map((track?: any) => (
-									<div
+							<div className="mt-6 grid gap-6">
+								{tracks.map((track) => (
+									<TrackFeedItem
 										key={track.id}
-										className="rounded-2xl border border-[#D6CFC7] bg-white p-5 shadow-sm"
-									>
-										<div className="mb-4">
-											<div className="flex h-40 items-center justify-center rounded-2xl bg-[#EAD9C7] text-[#4E3523]">
-												<span className="text-sm font-medium">
-													Cover Placeholder
-												</span>
-											</div>
-										</div>
-
-										<h3 className="text-lg font-semibold">{track.title}</h3>
-										<p className="mt-1 line-clamp-2 text-sm text-[#4E3523]/70">
-											{track.description || "No description"}
-										</p>
-
-										<div className="mt-3">
-											<span className="inline-block rounded-full bg-[#FAF8ED] px-3 py-1 text-xs font-medium text-[#4E3523]">
-												{track.fileType === "audio/mpeg"
-													? "MP3"
-													: track.fileType.includes("wav")
-														? "WAV"
-														: track.fileType}
-											</span>
-										</div>
-
-										<audio controls className="mt-4 w-full">
-											<source src={track.fileUrl} />
-											Your browser does not support audio playback.
-										</audio>
-									</div>
+										track={track}
+										isGuest={!currentUser}
+									/>
 								))}
 							</div>
 						)}
