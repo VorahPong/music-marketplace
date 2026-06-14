@@ -46,6 +46,10 @@ function getOptionalString(value: FormDataEntryValue | null) {
 	return trimmed.length > 0 ? trimmed : null;
 }
 
+function getStringValue(value: FormDataEntryValue | null) {
+	return typeof value === "string" ? value.trim() : "";
+}
+
 function getOptionalFile(value: FormDataEntryValue | null) {
 	if (!(value instanceof File) || value.size === 0) return null;
 	return value;
@@ -74,6 +78,10 @@ function isValidStorageKey(fileKey: string | null): fileKey is string {
 	);
 }
 
+function isValidKeyForFolder(fileKey: string | null, folder: "previews" | "regular" | "full") {
+	return Boolean(fileKey && isValidStorageKey(fileKey) && fileKey.startsWith(`${folder}/`));
+}
+
 async function deleteOldStorageFile(fileKey: string | null) {
 	if (!isValidStorageKey(fileKey)) return;
 
@@ -91,7 +99,7 @@ function isMp3(file: File) {
 
 function isWav(file: File) {
 	return (
-		["audio/wav", "audio/x-wav", "audio/wave"].includes(file.type) &&
+		["audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"].includes(file.type) &&
 		getFileExtension(file.name) === ".wav"
 	);
 }
@@ -151,6 +159,15 @@ export async function PATCH(
 		const previewMp3File = getOptionalFile(formData.get("previewMp3File"));
 		const regularWavFile = getOptionalFile(formData.get("regularWavFile"));
 		const fullZipFile = getOptionalFile(formData.get("fullZipFile"));
+
+		const previewMp3Key = getStringValue(formData.get("previewMp3Key")) || null;
+		const regularWavKeyFromClient = getStringValue(formData.get("regularWavKey")) || null;
+		const fullZipKeyFromClient = getStringValue(formData.get("fullZipKey")) || null;
+		const previewFileTypeFromClient = getStringValue(formData.get("previewFileType")) || null;
+
+		const hasPreviewKey = isValidKeyForFolder(previewMp3Key, "previews");
+		const hasRegularKey = isValidKeyForFolder(regularWavKeyFromClient, "regular");
+		const hasFullKey = isValidKeyForFolder(fullZipKeyFromClient, "full");
 
 		if (!title) {
 			return NextResponse.json({ error: "Title is required" }, { status: 400 });
@@ -216,6 +233,13 @@ export async function PATCH(
 			);
 		}
 
+		if (previewMp3Key && !hasPreviewKey) {
+			return NextResponse.json(
+				{ error: "Invalid preview file key." },
+				{ status: 400 },
+			);
+		}
+
 		if (regularWavFile && !isWav(regularWavFile)) {
 			return NextResponse.json(
 				{ error: "Regular version must be a WAV file" },
@@ -226,6 +250,13 @@ export async function PATCH(
 		if (regularWavFile && isFileTooLarge(regularWavFile, MAX_REGULAR_WAV_SIZE)) {
 			return NextResponse.json(
 				{ error: "Regular WAV file must be 250 MB or smaller." },
+				{ status: 400 },
+			);
+		}
+
+		if (regularWavKeyFromClient && !hasRegularKey) {
+			return NextResponse.json(
+				{ error: "Invalid regular WAV file key." },
 				{ status: 400 },
 			);
 		}
@@ -244,8 +275,15 @@ export async function PATCH(
 			);
 		}
 
+		if (fullZipKeyFromClient && !hasFullKey) {
+			return NextResponse.json(
+				{ error: "Invalid full ZIP file key." },
+				{ status: 400 },
+			);
+		}
+
 		if (isForSale) {
-			const hasRegularWav = Boolean(existingTrack.regularWavKey || regularWavFile);
+			const hasRegularWav = Boolean(existingTrack.regularWavKey || regularWavFile || hasRegularKey);
 
 			if (!hasRegularWav) {
 				return NextResponse.json(
@@ -268,7 +306,7 @@ export async function PATCH(
 				);
 			}
 
-			if ((existingTrack.fullZipKey || fullZipFile) && !fullPriceCents) {
+			if ((existingTrack.fullZipKey || fullZipFile || hasFullKey) && !fullPriceCents) {
 				return NextResponse.json(
 					{ error: "Full price is required when a full ZIP exists" },
 					{ status: 400 },
@@ -299,6 +337,11 @@ export async function PATCH(
 			await deleteOldStorageFile(existingTrack.previewMp3Url);
 		}
 
+		if (!previewMp3File && hasPreviewKey && previewMp3Key) {
+			previewMp3Url = previewMp3Key;
+			await deleteOldStorageFile(existingTrack.previewMp3Url);
+		}
+
 		if (isForSale && regularWavFile) {
 			regularWavKey = createStorageKey("regular", regularWavFile.name);
 
@@ -311,6 +354,11 @@ export async function PATCH(
 			await deleteOldStorageFile(existingTrack.regularWavKey);
 		}
 
+		if (isForSale && !regularWavFile && hasRegularKey && regularWavKeyFromClient) {
+			regularWavKey = regularWavKeyFromClient;
+			await deleteOldStorageFile(existingTrack.regularWavKey);
+		}
+
 		if (isForSale && fullZipFile) {
 			fullZipKey = createStorageKey("full", fullZipFile.name);
 
@@ -320,6 +368,11 @@ export async function PATCH(
 				contentType: fullZipFile.type || "application/zip",
 			});
 
+			await deleteOldStorageFile(existingTrack.fullZipKey);
+		}
+
+		if (isForSale && !fullZipFile && hasFullKey && fullZipKeyFromClient) {
+			fullZipKey = fullZipKeyFromClient;
 			await deleteOldStorageFile(existingTrack.fullZipKey);
 		}
 
@@ -342,7 +395,7 @@ export async function PATCH(
 				isForSale,
 				regularPriceCents: isForSale ? regularPriceCents : null,
 				fullPriceCents: isForSale ? fullPriceCents : null,
-				...(previewMp3Url ? { previewMp3Url, previewFileType: "audio/mpeg" } : {}),
+				...(previewMp3Url ? { previewMp3Url, previewFileType: previewFileTypeFromClient || "audio/mpeg" } : {}),
 				...(regularWavKey !== undefined ? { regularWavKey } : {}),
 				...(fullZipKey !== undefined ? { fullZipKey } : {}),
 			},

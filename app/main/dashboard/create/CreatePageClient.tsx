@@ -11,6 +11,13 @@ const TRACK_TYPES = ["SONG", "BEAT", "LOOP", "DRUMKIT"] as const;
 
 type TrackType = (typeof TRACK_TYPES)[number];
 
+type DirectUploadKind = "preview" | "regular" | "full";
+
+type DirectUploadResult = {
+	key: string;
+	contentType: string;
+};
+
 type EditableTrack = {
 	id: string;
 	title: string;
@@ -35,6 +42,44 @@ type CreatePageClientProps = {
 function centsToUsdInput(priceCents?: number | null) {
 	if (!priceCents) return "";
 	return (priceCents / 100).toFixed(2);
+}
+
+async function uploadFileDirectToR2(file: File, kind: DirectUploadKind) {
+	const uploadUrlResponse = await fetch("/api/storage/create-upload-url", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({
+			kind,
+			fileName: file.name,
+			contentType: file.type,
+			size: file.size,
+		}),
+	});
+
+	const uploadUrlData = await uploadUrlResponse.json();
+
+	if (!uploadUrlResponse.ok) {
+		throw new Error(uploadUrlData.error || "Unable to prepare file upload.");
+	}
+
+	const r2UploadResponse = await fetch(uploadUrlData.uploadUrl, {
+		method: "PUT",
+		headers: {
+			"Content-Type": uploadUrlData.contentType,
+		},
+		body: file,
+	});
+
+	if (!r2UploadResponse.ok) {
+		throw new Error("Direct file upload failed. Please try again.");
+	}
+
+	return {
+		key: uploadUrlData.key,
+		contentType: uploadUrlData.contentType,
+	} satisfies DirectUploadResult;
 }
 
 export default function CreatePageClient({
@@ -76,7 +121,9 @@ export default function CreatePageClient({
 	const [uploadedUrl, setUploadedUrl] = useState(
 		initialTrack?.previewMp3Url ?? "",
 	);
-	const [uploadedTrackId, setUploadedTrackId] = useState(initialTrack?.id ?? "");
+	const [uploadedTrackId, setUploadedTrackId] = useState(
+		initialTrack?.id ?? "",
+	);
 
 	const previewPlaybackUrl =
 		uploadedUrl?.startsWith("previews/") && uploadedTrackId
@@ -105,7 +152,7 @@ export default function CreatePageClient({
 		if (!selected) return;
 
 		const isWav =
-			["audio/wav", "audio/x-wav", "audio/wave"].includes(selected.type) ||
+			["audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"].includes(selected.type) ||
 			selected.name.toLowerCase().endsWith(".wav");
 
 		if (!isWav) {
@@ -207,6 +254,28 @@ export default function CreatePageClient({
 		setLoading(true);
 
 		try {
+			let directPreviewUpload: DirectUploadResult | null = null;
+			let directRegularUpload: DirectUploadResult | null = null;
+			let directFullUpload: DirectUploadResult | null = null;
+
+			if (previewMp3File) {
+				directPreviewUpload = await uploadFileDirectToR2(
+					previewMp3File,
+					"preview",
+				);
+			}
+
+			if (isForSale && regularWavFile) {
+				directRegularUpload = await uploadFileDirectToR2(
+					regularWavFile,
+					"regular",
+				);
+			}
+
+			if (isForSale && fullZipFile) {
+				directFullUpload = await uploadFileDirectToR2(fullZipFile, "full");
+			}
+
 			const formData = new FormData();
 			formData.append("title", title);
 			formData.append("description", description);
@@ -218,15 +287,22 @@ export default function CreatePageClient({
 			formData.append("regularPriceUsd", isForSale ? regularPriceUsd : "");
 			formData.append("fullPriceUsd", isForSale ? fullPriceUsd : "");
 
-			if (previewMp3File) {
+			if (directPreviewUpload) {
+				formData.append("previewMp3Key", directPreviewUpload.key);
+				formData.append("previewFileType", directPreviewUpload.contentType);
+			} else if (previewMp3File) {
 				formData.append("previewMp3File", previewMp3File);
 			}
 
-			if (isForSale && regularWavFile) {
+			if (isForSale && directRegularUpload) {
+				formData.append("regularWavKey", directRegularUpload.key);
+			} else if (isForSale && regularWavFile) {
 				formData.append("regularWavFile", regularWavFile);
 			}
 
-			if (isForSale && fullZipFile) {
+			if (isForSale && directFullUpload) {
+				formData.append("fullZipKey", directFullUpload.key);
+			} else if (isForSale && fullZipFile) {
 				formData.append("fullZipFile", fullZipFile);
 			}
 
@@ -520,7 +596,7 @@ export default function CreatePageClient({
 									</label>
 									<input
 										type="file"
-										accept=".wav,audio/wav,audio/x-wav"
+										accept=".wav,audio/wav,audio/x-wav,audio/wave,audio/vnd.wave"
 										onChange={handleRegularWavChange}
 										className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm"
 									/>
@@ -583,7 +659,7 @@ export default function CreatePageClient({
 						{loading
 							? isEditMode
 								? "Updating..."
-								: "Uploading..."
+								: "Uploading files..."
 							: isEditMode
 								? "Save Changes"
 								: "Upload"}
