@@ -3,12 +3,9 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-import { AtSign, Mail, Save, Settings, ShieldCheck, User } from "lucide-react";
-import { prisma } from "@/lib/prisma";
+import { AtSign, Lock, Mail, Settings, ShieldCheck, User } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 
-const HANDLE_REGEX = /^[a-z0-9_-]{3,30}$/;
 
 type SettingsPageProps = {
 	searchParams?: Promise<{
@@ -21,60 +18,6 @@ function formatRole(role: string) {
 	return role.charAt(0) + role.slice(1).toLowerCase();
 }
 
-async function updateProfile(formData: FormData) {
-	"use server";
-
-	const user = await getCurrentUser();
-
-	if (!user) {
-		redirect("/auth/login");
-	}
-
-	const name = String(formData.get("name") ?? "").trim();
-	const handle = String(formData.get("handle") ?? "")
-		.trim()
-		.toLowerCase();
-
-	if (!handle) {
-		redirect("/settings?error=Handle is required");
-	}
-
-	if (!HANDLE_REGEX.test(handle)) {
-		redirect(
-			"/settings?error=Handle must be 3-30 characters and only use lowercase letters, numbers, underscores, or hyphens",
-		);
-	}
-
-	const existingHandleUser = await prisma.user.findUnique({
-		where: {
-			handle,
-		},
-		select: {
-			id: true,
-		},
-	});
-
-	if (existingHandleUser && existingHandleUser.id !== user.id) {
-		redirect("/settings?error=That handle is already taken");
-	}
-
-	await prisma.user.update({
-		where: {
-			id: user.id,
-		},
-		data: {
-			name: name.length > 0 ? name : null,
-			handle,
-		},
-	});
-
-	revalidatePath("/settings");
-	revalidatePath("/main");
-	revalidatePath(`/main/channel/${user.handle}`);
-	revalidatePath(`/main/channel/${handle}`);
-
-	redirect("/settings?saved=Profile updated successfully");
-}
 
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
 	const user = await getCurrentUser();
@@ -124,10 +67,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 				)}
 
 				<div className="mt-8 grid gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-					<form
-						action={updateProfile}
-						className="rounded-3xl border border-[#D6CFC7] bg-white p-6 shadow-sm"
-					>
+					<div className="rounded-3xl border border-[#D6CFC7] bg-white p-6 shadow-sm">
 						<h2 className="text-xl font-bold">Profile Settings</h2>
 						<p className="mt-2 text-sm text-[#4E3523]/70">
 							This information appears on your public channel and around the marketplace.
@@ -140,14 +80,14 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 									Display Name
 								</label>
 								<input
-									name="name"
 									type="text"
-									defaultValue={user.name ?? ""}
+									value={user.name ?? ""}
+									readOnly
 									placeholder="Your display name"
-									className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
+									className="w-full cursor-not-allowed rounded-xl border border-[#D6CFC7] bg-[#FAF8ED] px-4 py-3 text-sm text-[#4E3523]/70 outline-none"
 								/>
 								<p className="mt-1 text-xs text-[#4E3523]/60">
-									Leave empty if you only want to show your handle.
+									Profile changes are currently disabled.
 								</p>
 							</div>
 
@@ -160,15 +100,14 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 									<span className="flex items-center bg-[#FAF8ED] px-4 text-sm text-[#4E3523]/60">
 										@</span>
 									<input
-										name="handle"
 										type="text"
-										defaultValue={user.handle}
-										placeholder="your-handle"
-										className="w-full bg-white px-4 py-3 text-sm outline-none"
+										value={user.handle}
+										readOnly
+										className="w-full cursor-not-allowed bg-[#FAF8ED] px-4 py-3 text-sm text-[#4E3523]/70 outline-none"
 									/>
 								</div>
 								<p className="mt-1 text-xs text-[#4E3523]/60">
-									3-30 characters. Lowercase letters, numbers, underscores, and hyphens only.
+									Handle changes are currently disabled.
 								</p>
 							</div>
 
@@ -190,13 +129,14 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
 						</div>
 
 						<button
-							type="submit"
-							className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#4E3523] px-4 py-3 text-sm font-semibold text-[#FAF8ED] hover:opacity-90"
+							type="button"
+							disabled
+							className="mt-6 flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-[#4E3523]/40 px-4 py-3 text-sm font-semibold text-[#FAF8ED]"
 						>
-							<Save size={16} />
-							Save Profile
+							<Lock size={16} />
+							Profile Editing Disabled
 						</button>
-					</form>
+					</div>
 
 					<aside className="space-y-6">
 						<div className="rounded-3xl border border-[#D6CFC7] bg-white p-6 shadow-sm">
