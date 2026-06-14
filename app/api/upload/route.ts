@@ -6,7 +6,11 @@ import {
 	createRateLimitKey,
 	rateLimitResponse,
 } from "@/lib/rateLimit";
-import { createStorageKey, uploadFileToStorage } from "@/lib/storage";
+import {
+	createStorageKey,
+	isValidStorageKey,
+	uploadFileToStorage,
+} from "@/lib/storage";
 // app/api/upload/route.ts
 export const runtime = "nodejs";
 
@@ -22,7 +26,12 @@ const MAX_REGULAR_WAV_SIZE = 250 * 1024 * 1024;
 const MAX_FULL_ZIP_SIZE = 1024 * 1024 * 1024;
 
 const ALLOWED_PREVIEW_TYPES = ["audio/mpeg"];
-const ALLOWED_WAV_TYPES = ["audio/wav", "audio/x-wav", "audio/wave"];
+const ALLOWED_WAV_TYPES = [
+	"audio/wav",
+	"audio/x-wav",
+	"audio/wave",
+	"audio/vnd.wave",
+];
 const ALLOWED_ZIP_TYPES = ["application/zip", "application/x-zip-compressed"];
 
 function getFileExtension(fileName: string) {
@@ -59,11 +68,26 @@ function isFileTooLarge(file: File, maxSize: number) {
 }
 
 function validatePriceCents(priceCents: number) {
-	return Number.isInteger(priceCents) && priceCents > 0 && priceCents <= MAX_PRICE_CENTS;
+	return (
+		Number.isInteger(priceCents) &&
+		priceCents > 0 &&
+		priceCents <= MAX_PRICE_CENTS
+	);
 }
 
 function canUploadTracks(role: string) {
 	return role === "SELLER" || role === "ADMIN";
+}
+
+function getStringValue(value: FormDataEntryValue | null) {
+	return typeof value === "string" ? value.trim() : "";
+}
+
+function isValidKeyForFolder(
+	key: string | null,
+	folder: "previews" | "regular" | "full",
+) {
+	return Boolean(key && isValidStorageKey(key, [folder]));
 }
 
 export async function POST(req: Request) {
@@ -106,16 +130,33 @@ export async function POST(req: Request) {
 		const regularWavFileRaw = formData.get("regularWavFile");
 		const fullZipFileRaw = formData.get("fullZipFile");
 
-		const previewMp3File = previewMp3FileRaw instanceof File ? previewMp3FileRaw : null;
-		const regularWavFile = regularWavFileRaw instanceof File ? regularWavFileRaw : null;
+		const previewMp3KeyRaw = getStringValue(formData.get("previewMp3Key"));
+		const regularWavKeyRaw = getStringValue(formData.get("regularWavKey"));
+		const fullZipKeyRaw = getStringValue(formData.get("fullZipKey"));
+		const previewFileTypeRaw = getStringValue(formData.get("previewFileType"));
+
+		const previewMp3File =
+			previewMp3FileRaw instanceof File ? previewMp3FileRaw : null;
+		const regularWavFile =
+			regularWavFileRaw instanceof File ? regularWavFileRaw : null;
 		const fullZipFile = fullZipFileRaw instanceof File ? fullZipFileRaw : null;
+
+		const previewMp3KeyFromClient = previewMp3KeyRaw || null;
+		const regularWavKeyFromClient = regularWavKeyRaw || null;
+		const fullZipKeyFromClient = fullZipKeyRaw || null;
 
 		const cleanTitle = title?.trim() || "";
 		const cleanDescription = description?.trim() || null;
 		const cleanTimeSignature = timeSignature?.trim() || null;
 		const cleanMusicalKey = musicalKey?.trim() || null;
 
-		if (!cleanTitle || !isValidUploadedFile(previewMp3File)) {
+		const hasPreviewFile = isValidUploadedFile(previewMp3File);
+		const hasPreviewKey = isValidKeyForFolder(
+			previewMp3KeyFromClient,
+			"previews",
+		);
+
+		if (!cleanTitle || (!hasPreviewFile && !hasPreviewKey)) {
 			return NextResponse.json(
 				{ error: "Title and preview MP3 are required." },
 				{ status: 400 },
@@ -131,33 +172,45 @@ export async function POST(req: Request) {
 
 		if (cleanDescription && cleanDescription.length > MAX_DESCRIPTION_LENGTH) {
 			return NextResponse.json(
-				{ error: `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.` },
+				{
+					error: `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`,
+				},
 				{ status: 400 },
 			);
 		}
 
-		if (cleanTimeSignature && cleanTimeSignature.length > MAX_TIME_SIGNATURE_LENGTH) {
+		if (
+			cleanTimeSignature &&
+			cleanTimeSignature.length > MAX_TIME_SIGNATURE_LENGTH
+		) {
 			return NextResponse.json(
-				{ error: `Time signature must be ${MAX_TIME_SIGNATURE_LENGTH} characters or fewer.` },
+				{
+					error: `Time signature must be ${MAX_TIME_SIGNATURE_LENGTH} characters or fewer.`,
+				},
 				{ status: 400 },
 			);
 		}
 
 		if (cleanMusicalKey && cleanMusicalKey.length > MAX_MUSICAL_KEY_LENGTH) {
 			return NextResponse.json(
-				{ error: `Musical key must be ${MAX_MUSICAL_KEY_LENGTH} characters or fewer.` },
+				{
+					error: `Musical key must be ${MAX_MUSICAL_KEY_LENGTH} characters or fewer.`,
+				},
 				{ status: 400 },
 			);
 		}
 
-		if (!isMp3File(previewMp3File)) {
+		if (hasPreviewFile && !isMp3File(previewMp3File)) {
 			return NextResponse.json(
 				{ error: "Preview file must be an MP3." },
 				{ status: 400 },
 			);
 		}
 
-		if (isFileTooLarge(previewMp3File, MAX_PREVIEW_MP3_SIZE)) {
+		if (
+			hasPreviewFile &&
+			isFileTooLarge(previewMp3File, MAX_PREVIEW_MP3_SIZE)
+		) {
 			return NextResponse.json(
 				{ error: "Preview MP3 must be 20 MB or smaller." },
 				{ status: 400 },
@@ -182,7 +235,11 @@ export async function POST(req: Request) {
 		if (bpmRaw?.trim()) {
 			const parsedBpm = Number(bpmRaw);
 
-			if (Number.isNaN(parsedBpm) || parsedBpm <= 0 || !Number.isInteger(parsedBpm)) {
+			if (
+				Number.isNaN(parsedBpm) ||
+				parsedBpm <= 0 ||
+				!Number.isInteger(parsedBpm)
+			) {
 				return NextResponse.json(
 					{ error: "Please provide a valid BPM." },
 					{ status: 400 },
@@ -197,21 +254,30 @@ export async function POST(req: Request) {
 		let fullPriceCents: number | null = null;
 
 		if (isForSale) {
-			if (!isValidUploadedFile(regularWavFile)) {
+			const hasRegularFile = isValidUploadedFile(regularWavFile);
+			const hasRegularKey = isValidKeyForFolder(
+				regularWavKeyFromClient,
+				"regular",
+			);
+
+			if (!hasRegularFile && !hasRegularKey) {
 				return NextResponse.json(
 					{ error: "Please upload a WAV file for the regular version." },
 					{ status: 400 },
 				);
 			}
 
-			if (!isWavFile(regularWavFile)) {
+			if (hasRegularFile && !isWavFile(regularWavFile)) {
 				return NextResponse.json(
 					{ error: "Regular version must be a WAV file." },
 					{ status: 400 },
 				);
 			}
 
-			if (isFileTooLarge(regularWavFile, MAX_REGULAR_WAV_SIZE)) {
+			if (
+				hasRegularFile &&
+				isFileTooLarge(regularWavFile, MAX_REGULAR_WAV_SIZE)
+			) {
 				return NextResponse.json(
 					{ error: "Regular WAV file must be 250 MB or smaller." },
 					{ status: 400 },
@@ -220,7 +286,11 @@ export async function POST(req: Request) {
 
 			const regularPriceUsd = Number(regularPriceUsdRaw);
 
-			if (!regularPriceUsdRaw?.trim() || Number.isNaN(regularPriceUsd) || regularPriceUsd <= 0) {
+			if (
+				!regularPriceUsdRaw?.trim() ||
+				Number.isNaN(regularPriceUsd) ||
+				regularPriceUsd <= 0
+			) {
 				return NextResponse.json(
 					{ error: "Please provide a valid regular price in USD." },
 					{ status: 400 },
@@ -236,15 +306,18 @@ export async function POST(req: Request) {
 				);
 			}
 
-			if (isValidUploadedFile(fullZipFile)) {
-				if (!isZipFile(fullZipFile)) {
+			const hasFullFile = isValidUploadedFile(fullZipFile);
+			const hasFullKey = isValidKeyForFolder(fullZipKeyFromClient, "full");
+
+			if (hasFullFile || hasFullKey) {
+				if (hasFullFile && !isZipFile(fullZipFile)) {
 					return NextResponse.json(
 						{ error: "Full version must be a ZIP file." },
 						{ status: 400 },
 					);
 				}
 
-				if (isFileTooLarge(fullZipFile, MAX_FULL_ZIP_SIZE)) {
+				if (hasFullFile && isFileTooLarge(fullZipFile, MAX_FULL_ZIP_SIZE)) {
 					return NextResponse.json(
 						{ error: "Full ZIP file must be 1 GB or smaller." },
 						{ status: 400 },
@@ -253,7 +326,11 @@ export async function POST(req: Request) {
 
 				const fullPriceUsd = Number(fullPriceUsdRaw);
 
-				if (!fullPriceUsdRaw?.trim() || Number.isNaN(fullPriceUsd) || fullPriceUsd <= 0) {
+				if (
+					!fullPriceUsdRaw?.trim() ||
+					Number.isNaN(fullPriceUsd) ||
+					fullPriceUsd <= 0
+				) {
 					return NextResponse.json(
 						{ error: "Please provide a valid full version price in USD." },
 						{ status: 400 },
@@ -271,18 +348,26 @@ export async function POST(req: Request) {
 			}
 		}
 
-		const previewMp3Key = createStorageKey("previews", previewMp3File.name);
+		let previewMp3Url = previewMp3KeyFromClient;
 
-		await uploadFileToStorage({
-			key: previewMp3Key,
-			file: previewMp3File,
-			contentType: previewMp3File.type || "audio/mpeg",
-		});
+		if (hasPreviewFile) {
+			const previewMp3Key = createStorageKey("previews", previewMp3File.name);
 
-		const previewMp3Url = previewMp3Key;
+			await uploadFileToStorage({
+				key: previewMp3Key,
+				file: previewMp3File,
+				contentType: previewMp3File.type || "audio/mpeg",
+			});
+
+			previewMp3Url = previewMp3Key;
+		}
 
 		let regularWavKey: string | null = null;
 		let fullZipKey: string | null = null;
+
+		if (isForSale) {
+			regularWavKey = regularWavKeyFromClient;
+		}
 
 		if (isForSale && isValidUploadedFile(regularWavFile)) {
 			regularWavKey = createStorageKey("regular", regularWavFile.name);
@@ -294,14 +379,23 @@ export async function POST(req: Request) {
 			});
 		}
 
+		if (isForSale) {
+			fullZipKey = fullZipKeyFromClient;
+		}
+
 		if (isForSale && isValidUploadedFile(fullZipFile)) {
 			fullZipKey = createStorageKey("full", fullZipFile.name);
-
 			await uploadFileToStorage({
 				key: fullZipKey,
 				file: fullZipFile,
 				contentType: fullZipFile.type || "application/zip",
 			});
+		}
+		if (!previewMp3Url) {
+			return NextResponse.json(
+				{ error: "Preview MP3 is required." },
+				{ status: 400 },
+			);
 		}
 
 		const track = await prisma.track.create({
@@ -309,7 +403,9 @@ export async function POST(req: Request) {
 				title: cleanTitle,
 				description: cleanDescription,
 				previewMp3Url,
-				previewFileType: previewMp3File.type || "audio/mpeg",
+				previewFileType: hasPreviewFile
+					? previewMp3File.type || "audio/mpeg"
+					: previewFileTypeRaw || "audio/mpeg",
 				regularWavKey,
 				fullZipKey,
 				trackType,

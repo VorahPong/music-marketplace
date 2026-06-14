@@ -1,7 +1,12 @@
 // do not remove
 // lib/storage.ts
 
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+	DeleteObjectCommand,
+	GetObjectCommand,
+	PutObjectCommand,
+	S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import crypto from "crypto";
 
@@ -49,6 +54,41 @@ function sanitizeFileExtension(fileName: string) {
 export function createStorageKey(folder: StorageFolder, fileName: string) {
 	const extension = sanitizeFileExtension(fileName);
 	return `${folder}/${crypto.randomUUID()}${extension}`;
+}
+
+export function isValidStorageKey(key: string, allowedFolders: StorageFolder[] = ["previews", "regular", "full"]) {
+	if (!key || key.includes("..") || key.startsWith("/") || key.includes("\\")) {
+		return false;
+	}
+
+	return allowedFolders.some((folder) => key.startsWith(`${folder}/`));
+}
+
+export async function createPresignedUploadUrl({
+	key,
+	contentType,
+	expiresInSeconds = 300,
+}: {
+	key: string;
+	contentType: string;
+	expiresInSeconds?: number;
+}) {
+	const config = getRequiredR2Config();
+	const client = getR2Client();
+
+	if (!isValidStorageKey(key)) {
+		throw new Error("Invalid storage key.");
+	}
+
+	return getSignedUrl(
+		client,
+		new PutObjectCommand({
+			Bucket: config.bucketName,
+			Key: key,
+			ContentType: contentType || "application/octet-stream",
+		}),
+		{ expiresIn: expiresInSeconds },
+	);
 }
 
 export async function uploadFileToStorage({
