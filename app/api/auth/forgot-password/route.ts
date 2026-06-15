@@ -54,14 +54,10 @@ export async function POST(req: Request) {
 		const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
 		await prisma.$transaction([
-			prisma.authCode.updateMany({
+			prisma.authCode.deleteMany({
 				where: {
 					userId: user.id,
 					purpose: "RESET_PASSWORD",
-					usedAt: null,
-				},
-				data: {
-					usedAt: new Date(),
 				},
 			}),
 			prisma.authCode.create({
@@ -79,8 +75,6 @@ export async function POST(req: Request) {
 			code: resetCode,
 			purpose: "RESET_PASSWORD",
 		});
-
-		console.log(`Password reset code for ${user.email}: ${resetCode}`);
 
 		return NextResponse.json({ message: safeMessage });
 	} catch (error) {

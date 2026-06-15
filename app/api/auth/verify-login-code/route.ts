@@ -109,19 +109,17 @@ export async function POST(req: Request) {
 		const expiresAt = new Date(Date.now() + authConfig.sessionDurationMs);
 
 		await prisma.$transaction([
-			prisma.authCode.update({
-				where: {
-					id: authCode.id,
-				},
-				data: {
-					usedAt: new Date(),
-				},
-			}),
 			prisma.session.create({
 				data: {
 					token,
 					userId: user.id,
 					expiresAt,
+				},
+			}),
+			prisma.authCode.deleteMany({
+				where: {
+					userId: user.id,
+					purpose: "LOGIN",
 				},
 			}),
 		]);

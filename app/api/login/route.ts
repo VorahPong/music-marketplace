@@ -22,33 +22,28 @@ async function createLoginCode(userId: string, email: string) {
 	const codeHash = await bcrypt.hash(loginCode, 10);
 	const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-	await prisma.authCode.updateMany({
-		where: {
-			userId,
-			purpose: "LOGIN",
-			usedAt: null,
-		},
-		data: {
-			usedAt: new Date(),
-		},
-	});
-
-	await prisma.authCode.create({
-		data: {
-			userId,
-			codeHash,
-			purpose: "LOGIN",
-			expiresAt,
-		},
-	});
+	await prisma.$transaction([
+		prisma.authCode.deleteMany({
+			where: {
+				userId,
+				purpose: "LOGIN",
+			},
+		}),
+		prisma.authCode.create({
+			data: {
+				userId,
+				codeHash,
+				purpose: "LOGIN",
+				expiresAt,
+			},
+		}),
+	]);
 
 	await sendVerificationCodeEmail({
 		to: email,
 		code: loginCode,
 		purpose: "LOGIN",
 	});
-
-	console.log(`Login verification code for ${email}: ${loginCode}`);
 }
 
 export async function POST(req: Request) {
