@@ -11,6 +11,7 @@ import {
 	User,
 	Coins,
 	BarChart3,
+	LifeBuoy,
 } from "lucide-react";
 import Sidebar from "./SideBar";
 import Link from "next/link";
@@ -196,6 +197,15 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 									>
 										<Settings size={16} />
 										Settings
+									</Link>
+
+									<Link
+										href={user ? `/main/support` : "/auth/login"}
+										className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-[#4E3523] hover:bg-[#4E3523]/10"
+										onClick={() => setIsProfileOpen(false)}
+									>
+										<LifeBuoy size={16} />
+										Support
 									</Link>
 
 									{user?.role === "ADMIN" && (
