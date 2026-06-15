@@ -1,5 +1,3 @@
-
-
 // do not remove
 // app/main/dashboard/analytics/page.tsx
 
@@ -35,7 +33,7 @@ export default async function SellerAnalyticsPage() {
 		redirect("/auth/login");
 	}
 
-	if (user.role !== "SELLER") {
+	if (user.role !== "SELLER" && user.role !== "ADMIN") {
 		redirect("/main");
 	}
 
@@ -317,6 +315,72 @@ export default async function SellerAnalyticsPage() {
 						)}
 					</section>
 				</div>
+
+				<section className="mt-8 rounded-3xl border border-[#D6CFC7] bg-white p-6 shadow-sm">
+					<div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+						<div>
+							<h2 className="text-xl font-bold">Sales by Track</h2>
+							<p className="mt-1 text-sm text-[#4E3523]/60">
+								See exactly how each beat or track is performing.
+							</p>
+						</div>
+					</div>
+
+					{topTracks.length === 0 ? (
+						<div className="mt-6 rounded-2xl bg-[#FAF8ED] p-5 text-sm text-[#4E3523]/70">
+							No per-track sales yet. Once a customer buys a beat, it will show here.
+						</div>
+					) : (
+						<div className="mt-5 overflow-hidden rounded-2xl border border-[#D6CFC7]">
+							<div className="overflow-x-auto">
+								<table className="w-full min-w-[760px] text-left text-sm">
+									<thead className="bg-[#FAF8ED] text-xs uppercase tracking-wide text-[#4E3523]/60">
+										<tr>
+											<th className="px-4 py-3 font-semibold">Track</th>
+											<th className="px-4 py-3 font-semibold">Type</th>
+											<th className="px-4 py-3 text-right font-semibold">Regular WAV</th>
+											<th className="px-4 py-3 text-right font-semibold">Full ZIP</th>
+											<th className="px-4 py-3 text-right font-semibold">Total Sales</th>
+											<th className="px-4 py-3 text-right font-semibold">Revenue</th>
+											<th className="px-4 py-3 font-semibold">Status</th>
+										</tr>
+									</thead>
+									<tbody className="divide-y divide-[#D6CFC7]">
+										{topTracks.map((track) => (
+											<tr key={track.id} className="hover:bg-[#FAF8ED]/60">
+												<td className="px-4 py-4">
+													<Link href={`/main/song/${track.id}`} className="font-semibold hover:underline">
+														{track.title}
+													</Link>
+												</td>
+												<td className="px-4 py-4 text-[#4E3523]/70">{track.trackType}</td>
+												<td className="px-4 py-4 text-right font-medium">{track.regularSales}</td>
+												<td className="px-4 py-4 text-right font-medium">{track.fullSales}</td>
+												<td className="px-4 py-4 text-right font-bold">{track.totalSales}</td>
+												<td className="px-4 py-4 text-right font-bold">{formatMoney(track.revenueCents)}</td>
+												<td className="px-4 py-4">
+													{track.deletedAt ? (
+														<span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-600">
+															Deleted
+														</span>
+													) : track.isPublished ? (
+														<span className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+															Published
+														</span>
+													) : (
+														<span className="rounded-full bg-yellow-50 px-3 py-1 text-xs font-semibold text-yellow-700">
+															Unpublished
+														</span>
+													)}
+												</td>
+											</tr>
+										))}
+									</tbody>
+								</table>
+							</div>
+						</div>
+					)}
+				</section>
 			</section>
 		</main>
 	);

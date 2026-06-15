@@ -113,6 +113,14 @@ export default function LoginForm() {
 	const inputClass =
 		"w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 pl-11 text-sm text-white placeholder:text-zinc-500 outline-none transition focus:border-[#EAD9C7]/70 focus:bg-white/[0.09]";
 
+	function resetToCredentialsStep() {
+		setStep("credentials");
+		setPassword("");
+		setCode("");
+		setError("");
+		setMessage("");
+	}
+
 	if (step === "twoFactor") {
 		return (
 			<form onSubmit={handleVerifyCode} className="space-y-5">
@@ -169,15 +177,10 @@ export default function LoginForm() {
 				<button
 					type="button"
 					disabled={loading}
-					onClick={() => {
-						setStep("credentials");
-						setCode("");
-						setError("");
-						setMessage("");
-					}}
+					onClick={resetToCredentialsStep}
 					className="w-full rounded-2xl border border-white/10 px-4 py-3.5 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
 				>
-					Back to login
+					Back to login form
 				</button>
 			</form>
 		);

@@ -95,20 +95,18 @@ export async function POST(req: Request) {
 		}
 
 		await prisma.$transaction([
-			prisma.authCode.update({
-				where: {
-					id: authCode.id,
-				},
-				data: {
-					usedAt: new Date(),
-				},
-			}),
 			prisma.user.update({
 				where: {
 					id: user.id,
 				},
 				data: {
 					emailVerifiedAt: new Date(),
+				},
+			}),
+			prisma.authCode.deleteMany({
+				where: {
+					userId: user.id,
+					purpose: "REGISTER",
 				},
 			}),
 		]);

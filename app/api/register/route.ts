@@ -130,7 +130,6 @@ export async function POST(req: Request) {
 			purpose: "REGISTER",
 		});
 
-		console.log(`Registration verification code for ${email}: ${verificationCode}`);
 
 		return NextResponse.json(
 			{

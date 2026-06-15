@@ -100,10 +100,10 @@ export async function POST(req: Request) {
 					passwordHash,
 				},
 			}),
-			prisma.authCode.update({
-				where: { id: authCode.id },
-				data: {
-					usedAt: new Date(),
+			prisma.authCode.deleteMany({
+				where: {
+					userId: user.id,
+					purpose: "RESET_PASSWORD",
 				},
 			}),
 			prisma.session.deleteMany({
