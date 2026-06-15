@@ -82,6 +82,52 @@ async function uploadFileDirectToR2(file: File, kind: DirectUploadKind) {
 	} satisfies DirectUploadResult;
 }
 
+function formatFileSize(size: number) {
+	if (size >= 1024 * 1024 * 1024) {
+		return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+	}
+
+	if (size >= 1024 * 1024) {
+		return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+	}
+
+	return `${Math.max(1, Math.round(size / 1024))} KB`;
+}
+
+function SelectedFileCard({ file, label }: { file: File; label: string }) {
+	return (
+		<div className="mt-3 flex items-center gap-3 rounded-xl border border-[#D6CFC7] bg-[#FAF8ED] px-4 py-3 text-sm text-[#4E3523]">
+			<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-lg shadow-sm">
+				📄
+			</div>
+			<div className="min-w-0 flex-1">
+				<p className="font-semibold">{label}</p>
+				<p className="truncate text-xs text-[#4E3523]/70">{file.name}</p>
+				<p className="text-xs text-[#4E3523]/50">{formatFileSize(file.size)}</p>
+			</div>
+		</div>
+	);
+}
+
+function OwnerDownloadButton({
+	trackId,
+	version,
+	children,
+}: {
+	trackId: string;
+	version: "REGULAR" | "FULL";
+	children: React.ReactNode;
+}) {
+	return (
+		<a
+			href={`/api/tracks/${trackId}/download?version=${version}`}
+			className="inline-flex items-center justify-center rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm font-semibold text-[#4E3523] hover:bg-[#FAF8ED]"
+		>
+			{children}
+		</a>
+	);
+}
+
 export default function CreatePageClient({
 	mode = "create",
 	initialTrack,
@@ -395,6 +441,28 @@ export default function CreatePageClient({
 						: "Upload a fast MP3 preview for customers to stream. Add a protected WAV for the regular version and an optional ZIP for the full version."}
 				</p>
 
+				{isEditMode && initialTrack && (initialTrack.regularWavKey || initialTrack.fullZipKey) && (
+					<div className="mt-6 rounded-2xl border border-[#D6CFC7] bg-white p-4 shadow-sm">
+						<h2 className="text-sm font-semibold">Owner Downloads</h2>
+						<p className="mt-1 text-xs text-[#4E3523]/60">
+							Download the protected files attached to this track.
+						</p>
+						<div className="mt-4 flex flex-col gap-3 sm:flex-row">
+							{initialTrack.regularWavKey && (
+								<OwnerDownloadButton trackId={initialTrack.id} version="REGULAR">
+									Download WAV
+								</OwnerDownloadButton>
+							)}
+
+							{initialTrack.fullZipKey && (
+								<OwnerDownloadButton trackId={initialTrack.id} version="FULL">
+									Download ZIP
+								</OwnerDownloadButton>
+							)}
+						</div>
+					</div>
+				)}
+
 				<form
 					onSubmit={handleSubmit}
 					className="mt-6 space-y-5 rounded-2xl border border-[#D6CFC7] bg-white p-6 shadow-sm"
@@ -581,11 +649,7 @@ export default function CreatePageClient({
 									: "Public streaming preview. This should be optimized for fast playback."}
 							</p>
 
-							{previewMp3File && (
-								<p className="mt-2 text-sm text-[#4E3523]/70">
-									Selected: {previewMp3File.name}
-								</p>
-							)}
+							{previewMp3File && <SelectedFileCard file={previewMp3File} label="Selected MP3" />}
 						</div>
 
 						{isForSale && (
@@ -606,11 +670,7 @@ export default function CreatePageClient({
 											: "Protected download after regular purchase."}
 									</p>
 
-									{regularWavFile && (
-										<p className="mt-2 text-sm text-[#4E3523]/70">
-											Selected: {regularWavFile.name}
-										</p>
-									)}
+									{regularWavFile && <SelectedFileCard file={regularWavFile} label="Selected WAV" />}
 								</div>
 
 								<div>
@@ -629,11 +689,7 @@ export default function CreatePageClient({
 											: "Optional protected download after full purchase. Use this for stems, license files, or project files."}
 									</p>
 
-									{fullZipFile && (
-										<p className="mt-2 text-sm text-[#4E3523]/70">
-											Selected: {fullZipFile.name}
-										</p>
-									)}
+									{fullZipFile && <SelectedFileCard file={fullZipFile} label="Selected ZIP" />}
 								</div>
 							</>
 						)}
