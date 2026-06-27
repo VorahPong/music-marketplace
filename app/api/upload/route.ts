@@ -259,10 +259,12 @@ export async function POST(req: Request) {
 				regularWavKeyFromClient,
 				"regular",
 			);
+			const hasFullFile = isValidUploadedFile(fullZipFile);
+			const hasFullKey = isValidKeyForFolder(fullZipKeyFromClient, "full");
 
-			if (!hasRegularFile && !hasRegularKey) {
+			if (!hasRegularFile && !hasRegularKey && !hasFullFile && !hasFullKey) {
 				return NextResponse.json(
-					{ error: "Please upload a WAV file for the regular version." },
+					{ error: "Please upload a WAV file, a ZIP file, or both to list this item for sale." },
 					{ status: 400 },
 				);
 			}
@@ -284,46 +286,45 @@ export async function POST(req: Request) {
 				);
 			}
 
-			const regularPriceUsd = Number(regularPriceUsdRaw);
+			if (hasRegularFile || hasRegularKey) {
+				const regularPriceUsd = Number(regularPriceUsdRaw);
 
-			if (
-				!regularPriceUsdRaw?.trim() ||
-				Number.isNaN(regularPriceUsd) ||
-				regularPriceUsd <= 0
-			) {
+				if (
+					!regularPriceUsdRaw?.trim() ||
+					Number.isNaN(regularPriceUsd) ||
+					regularPriceUsd <= 0
+				) {
+					return NextResponse.json(
+						{ error: "Please provide a valid regular price in USD." },
+						{ status: 400 },
+					);
+				}
+
+				regularPriceCents = Math.round(regularPriceUsd * 100);
+
+				if (!validatePriceCents(regularPriceCents)) {
+					return NextResponse.json(
+						{ error: "Regular price must be between $0.01 and $1,000." },
+						{ status: 400 },
+					);
+				}
+			}
+
+			if (hasFullFile && !isZipFile(fullZipFile)) {
 				return NextResponse.json(
-					{ error: "Please provide a valid regular price in USD." },
+					{ error: "Full version must be a ZIP file." },
 					{ status: 400 },
 				);
 			}
 
-			regularPriceCents = Math.round(regularPriceUsd * 100);
-
-			if (!validatePriceCents(regularPriceCents)) {
+			if (hasFullFile && isFileTooLarge(fullZipFile, MAX_FULL_ZIP_SIZE)) {
 				return NextResponse.json(
-					{ error: "Regular price must be between $0.01 and $1,000." },
+					{ error: "Full ZIP file must be 1 GB or smaller." },
 					{ status: 400 },
 				);
 			}
-
-			const hasFullFile = isValidUploadedFile(fullZipFile);
-			const hasFullKey = isValidKeyForFolder(fullZipKeyFromClient, "full");
 
 			if (hasFullFile || hasFullKey) {
-				if (hasFullFile && !isZipFile(fullZipFile)) {
-					return NextResponse.json(
-						{ error: "Full version must be a ZIP file." },
-						{ status: 400 },
-					);
-				}
-
-				if (hasFullFile && isFileTooLarge(fullZipFile, MAX_FULL_ZIP_SIZE)) {
-					return NextResponse.json(
-						{ error: "Full ZIP file must be 1 GB or smaller." },
-						{ status: 400 },
-					);
-				}
-
 				const fullPriceUsd = Number(fullPriceUsdRaw);
 
 				if (
