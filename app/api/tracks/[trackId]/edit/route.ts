@@ -284,40 +284,45 @@ export async function PATCH(
 
 		if (isForSale) {
 			const hasRegularWav = Boolean(existingTrack.regularWavKey || regularWavFile || hasRegularKey);
+			const hasFullZip = Boolean(existingTrack.fullZipKey || fullZipFile || hasFullKey);
 
-			if (!hasRegularWav) {
+			if (!hasRegularWav && !hasFullZip) {
 				return NextResponse.json(
-					{ error: "Regular WAV file is required for items that are for sale" },
+					{ error: "Please upload a WAV file, a ZIP file, or both to list this item for sale." },
 					{ status: 400 },
 				);
 			}
 
-			if (!regularPriceCents) {
-				return NextResponse.json(
-					{ error: "Regular price is required for items that are for sale" },
-					{ status: 400 },
-				);
+			if (hasRegularWav) {
+				if (!regularPriceCents) {
+					return NextResponse.json(
+						{ error: "Regular price is required when a WAV file exists" },
+						{ status: 400 },
+					);
+				}
+
+				if (regularPriceCents > MAX_PRICE_CENTS) {
+					return NextResponse.json(
+						{ error: "Regular price must be between $0.01 and $1,000." },
+						{ status: 400 },
+					);
+				}
 			}
 
-			if (regularPriceCents > MAX_PRICE_CENTS) {
-				return NextResponse.json(
-					{ error: "Regular price must be between $0.01 and $1,000." },
-					{ status: 400 },
-				);
-			}
+			if (hasFullZip) {
+				if (!fullPriceCents) {
+					return NextResponse.json(
+						{ error: "Full price is required when a full ZIP exists" },
+						{ status: 400 },
+					);
+				}
 
-			if ((existingTrack.fullZipKey || fullZipFile || hasFullKey) && !fullPriceCents) {
-				return NextResponse.json(
-					{ error: "Full price is required when a full ZIP exists" },
-					{ status: 400 },
-				);
-			}
-
-			if (fullPriceCents && fullPriceCents > MAX_PRICE_CENTS) {
-				return NextResponse.json(
-					{ error: "Full version price must be between $0.01 and $1,000." },
-					{ status: 400 },
-				);
+				if (fullPriceCents > MAX_PRICE_CENTS) {
+					return NextResponse.json(
+						{ error: "Full version price must be between $0.01 and $1,000." },
+						{ status: 400 },
+					);
+				}
 			}
 		}
 
@@ -383,6 +388,13 @@ export async function PATCH(
 			fullZipKey = null;
 		}
 
+		const hasRegularVersionAfterUpdate = Boolean(
+			isForSale && (regularWavKey ?? existingTrack.regularWavKey),
+		);
+		const hasFullVersionAfterUpdate = Boolean(
+			isForSale && (fullZipKey ?? existingTrack.fullZipKey),
+		);
+
 		const updatedTrack = await prisma.track.update({
 			where: { id: existingTrack.id },
 			data: {
@@ -393,8 +405,8 @@ export async function PATCH(
 				timeSignature,
 				musicalKey,
 				isForSale,
-				regularPriceCents: isForSale ? regularPriceCents : null,
-				fullPriceCents: isForSale ? fullPriceCents : null,
+				regularPriceCents: hasRegularVersionAfterUpdate ? regularPriceCents : null,
+				fullPriceCents: hasFullVersionAfterUpdate ? fullPriceCents : null,
 				...(previewMp3Url ? { previewMp3Url, previewFileType: previewFileTypeFromClient || "audio/mpeg" } : {}),
 				...(regularWavKey !== undefined ? { regularWavKey } : {}),
 				...(fullZipKey !== undefined ? { fullZipKey } : {}),
