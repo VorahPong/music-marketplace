@@ -257,40 +257,27 @@ export default function CreatePageClient({
 		if (isForSale) {
 			const regularPrice = Number(regularPriceUsd);
 			const fullPrice = Number(fullPriceUsd);
-			const hasExistingRegularWav = Boolean(initialTrack?.regularWavKey);
+			const hasRegularVersion = Boolean(initialTrack?.regularWavKey || regularWavFile);
+			const hasFullVersion = Boolean(initialTrack?.fullZipKey || fullZipFile);
 
-			if (!isEditMode && !regularWavFile) {
-				setError("Please upload a WAV file for the regular version.");
-				return;
-			}
-
-			if (isEditMode && !hasExistingRegularWav && !regularWavFile) {
-				setError("Please upload a WAV file for the regular version.");
+			if (!hasRegularVersion && !hasFullVersion) {
+				setError("Please upload a WAV file, a ZIP file, or both to list this item for sale.");
 				return;
 			}
 
 			if (
-				!regularPriceUsd.trim() ||
-				Number.isNaN(regularPrice) ||
-				regularPrice <= 0
+				hasRegularVersion &&
+				(!regularPriceUsd.trim() ||
+					Number.isNaN(regularPrice) ||
+					regularPrice <= 0)
 			) {
 				setError("Please enter a valid regular price in USD.");
 				return;
 			}
 
 			if (
-				fullZipFile &&
+				hasFullVersion &&
 				(!fullPriceUsd.trim() || Number.isNaN(fullPrice) || fullPrice <= 0)
-			) {
-				setError("Please enter a valid full version price in USD.");
-				return;
-			}
-
-			if (
-				isEditMode &&
-				initialTrack?.fullZipKey &&
-				fullPriceUsd.trim() &&
-				(Number.isNaN(fullPrice) || fullPrice <= 0)
 			) {
 				setError("Please enter a valid full version price in USD.");
 				return;
@@ -607,8 +594,7 @@ export default function CreatePageClient({
 								className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
 							/>
 							<p className="mt-1 text-xs text-[#4E3523]/60">
-								Customers who buy the regular version will get access to the WAV
-								file.
+								Required only if you upload or keep a regular WAV file.
 							</p>
 
 							<div className="mt-4">
@@ -625,8 +611,7 @@ export default function CreatePageClient({
 									className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
 								/>
 								<p className="mt-1 text-xs text-[#4E3523]/60">
-									Optional. Customers who buy the full version will get access
-									to the ZIP file.
+									Required only if you upload or keep a full ZIP/stems file.
 								</p>
 							</div>
 						</div>
@@ -666,8 +651,8 @@ export default function CreatePageClient({
 									/>
 									<p className="mt-1 text-xs text-[#4E3523]/60">
 										{isEditMode
-											? "Leave empty to keep the current regular WAV."
-											: "Protected download after regular purchase."}
+											? "Optional. Leave empty to keep the current regular WAV."
+											: "Optional. Add this if you want to sell a regular WAV version."}
 									</p>
 
 									{regularWavFile && <SelectedFileCard file={regularWavFile} label="Selected WAV" />}
@@ -685,8 +670,8 @@ export default function CreatePageClient({
 									/>
 									<p className="mt-1 text-xs text-[#4E3523]/60">
 										{isEditMode
-											? "Leave empty to keep the current full ZIP."
-											: "Optional protected download after full purchase. Use this for stems, license files, or project files."}
+											? "Optional. Leave empty to keep the current full ZIP."
+											: "Optional. Add this if you want to sell stems, license files, or project files."}
 									</p>
 
 									{fullZipFile && <SelectedFileCard file={fullZipFile} label="Selected ZIP" />}
