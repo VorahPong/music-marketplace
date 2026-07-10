@@ -194,7 +194,7 @@ export default function LoginForm() {
 						<ShieldCheck size={23} />
 					</div>
 					<div>
-						<h2 className="text-xl font-bold text-white">Welcome back</h2>
+						<h2 className="text-xl font-bold text-white">Welcome</h2>
 						<p className="mt-1 text-sm leading-6 text-zinc-400">
 							Log in to manage your music, purchases, downloads, and account.
 						</p>

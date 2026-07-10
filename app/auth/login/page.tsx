@@ -4,8 +4,8 @@ import LoginForm from "@/app/components/auth/LoginForm";
 export default function LoginPage() {
 	return (
 		<AuthCard
-			title="Welcome back"
-			subtitle="Log in to manage your music and purchases."
+			title=""
+			subtitle=""
 		>
 			<LoginForm />
 		</AuthCard>
