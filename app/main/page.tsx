@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import TrackFeedList from "../components/TrackFeedList";
@@ -8,8 +9,11 @@ import TrackFeedList from "../components/TrackFeedList";
 type HomePageProps = {
 	searchParams?: Promise<{
 		q?: string;
+		page?: string;
 	}>;
 };
+
+const TRACKS_PER_PAGE = 12;
 
 export default async function HomePage({ searchParams }: HomePageProps) {
 	const user = await getCurrentUser();
@@ -18,55 +22,85 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 	const searchQuery =
 		rawSearchQuery.length >= 2 ? rawSearchQuery.slice(0, 80) : "";
 
-	const tracks = await prisma.track.findMany({
-		where: {
-			isPublished: true,
-			deletedAt: null,
-			...(searchQuery
-				? {
-						title: {
-							contains: searchQuery,
-							mode: "insensitive" as const,
-						},
-					}
-				: {}),
-		},
-		orderBy: {
-			createdAt: "desc",
-		},
-		include: {
-			owner: {
-				select: {
-					id: true,
-					name: true,
-					handle: true,
-				},
+	const requestedPage = Number(resolvedSearchParams?.page ?? "1");
+	const currentPage =
+		Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+
+	const where = {
+		isPublished: true,
+		deletedAt: null,
+		...(searchQuery
+			? {
+					title: {
+						contains: searchQuery,
+						mode: "insensitive" as const,
+					},
+				}
+			: {}),
+	};
+
+	const [tracks, totalTracks] = await Promise.all([
+		prisma.track.findMany({
+			where,
+			orderBy: {
+				createdAt: "desc",
 			},
-			_count: {
-				select: {
-					likes: true,
-					comments: true,
+			skip: (currentPage - 1) * TRACKS_PER_PAGE,
+			take: TRACKS_PER_PAGE,
+			include: {
+				owner: {
+					select: {
+						id: true,
+						name: true,
+						handle: true,
+					},
 				},
+				_count: {
+					select: {
+						likes: true,
+						comments: true,
+					},
+				},
+				likes: user
+					? {
+							where: {
+								userId: user.id,
+							},
+							select: { id: true },
+						}
+					: false,
+				purchases: user
+					? {
+							where: { userId: user.id },
+							select: {
+								id: true,
+								version: true,
+							},
+						}
+					: false,
 			},
-			likes: user
-				? {
-						where: {
-							userId: user.id,
-						},
-						select: { id: true },
-					}
-				: false,
-			purchases: user
-				? {
-						where: { userId: user.id },
-						select: {
-							id: true,
-							version: true,
-						},
-					}
-				: false,
-		},
-	});
+		}),
+		prisma.track.count({ where }),
+	]);
+
+	const totalPages = Math.max(1, Math.ceil(totalTracks / TRACKS_PER_PAGE));
+	const visibleStart = totalTracks === 0 ? 0 : (currentPage - 1) * TRACKS_PER_PAGE + 1;
+	const visibleEnd = Math.min(currentPage * TRACKS_PER_PAGE, totalTracks);
+
+	function getPageHref(page: number) {
+		const params = new URLSearchParams();
+
+		if (rawSearchQuery) {
+			params.set("q", rawSearchQuery);
+		}
+
+		if (page > 1) {
+			params.set("page", String(page));
+		}
+
+		const queryString = params.toString();
+		return queryString ? `/main?${queryString}` : "/main";
+	}
 
 	const feedTracks = tracks.map((track) => {
 		const userPurchases = Array.isArray(track.purchases) ? track.purchases : [];
@@ -174,7 +208,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 							</div>
 							<div className="mt-3 grid grid-cols-3 gap-2 text-center">
 								<div className="rounded-xl border border-white/10 bg-white/[0.06] px-2 py-3">
-									<p className="text-xl font-black text-white">{tracks.length}</p>
+									<p className="text-xl font-black text-white">{totalTracks}</p>
 									<p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[#EAD9C7]/70">
 										Tracks
 									</p>
@@ -209,7 +243,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 							</h2>
 						</div>
 						<p className="rounded-full border border-[#D6CFC7] bg-white px-4 py-2 text-sm font-semibold text-[#4E3523]/75 shadow-sm">
-							{tracks.length} {tracks.length === 1 ? "track" : "tracks"}
+							{totalTracks === 0
+								? "0 tracks"
+								: `${visibleStart}-${visibleEnd} of ${totalTracks} ${
+										totalTracks === 1 ? "track" : "tracks"
+									}`}
 						</p>
 					</div>
 
@@ -230,7 +268,45 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 							</div>
 						</div>
 					) : (
-						<TrackFeedList tracks={feedTracks} isGuest={!user} />
+						<>
+							<TrackFeedList tracks={feedTracks} isGuest={!user} />
+
+							{totalPages > 1 && (
+								<nav className="mt-8 flex flex-col items-center justify-between gap-3 rounded-2xl border border-[#D6CFC7] bg-white px-4 py-4 shadow-sm sm:flex-row">
+									<p className="text-sm font-semibold text-[#4E3523]/70">
+										Page {currentPage} of {totalPages}
+									</p>
+
+									<div className="flex items-center gap-2">
+										{currentPage > 1 ? (
+											<Link
+												href={getPageHref(currentPage - 1)}
+												className="rounded-full border border-[#D6CFC7] px-4 py-2 text-sm font-bold text-[#4E3523] transition hover:bg-[#FAF8ED]"
+											>
+												Previous
+											</Link>
+										) : (
+											<span className="cursor-not-allowed rounded-full border border-[#D6CFC7] px-4 py-2 text-sm font-bold text-[#4E3523]/35">
+												Previous
+											</span>
+										)}
+
+										{currentPage < totalPages ? (
+											<Link
+												href={getPageHref(currentPage + 1)}
+												className="rounded-full bg-[#4E3523] px-4 py-2 text-sm font-bold text-[#FAF8ED] transition hover:opacity-90"
+											>
+												Next
+											</Link>
+										) : (
+											<span className="cursor-not-allowed rounded-full bg-[#4E3523]/30 px-4 py-2 text-sm font-bold text-white">
+												Next
+											</span>
+										)}
+									</div>
+								</nav>
+							)}
+						</>
 					)}
 				</div>
 			</div>

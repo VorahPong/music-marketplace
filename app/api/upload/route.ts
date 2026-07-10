@@ -90,6 +90,75 @@ function isValidKeyForFolder(
 	return Boolean(key && isValidStorageKey(key, [folder]));
 }
 
+/**
+ * @swagger
+ * /api/upload:
+ *   post:
+ *     summary: Create a new track
+ *     tags:
+ *       - Tracks
+ *     description: >
+ *       Creates a new track. Supports direct Cloudflare R2 upload keys
+ *       and fallback multipart file upload for local development.
+ *     security:
+ *       - sessionCookie: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - previewMp3Key
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Late Night Beat
+ *               description:
+ *                 type: string
+ *               trackType:
+ *                 $ref: '#/components/schemas/TrackType'
+ *               bpm:
+ *                 type: string
+ *                 example: "140"
+ *               timeSignature:
+ *                 type: string
+ *                 example: "4/4"
+ *               musicalKey:
+ *                 type: string
+ *                 example: C minor
+ *               isForSale:
+ *                 type: string
+ *                 enum: ["true", "false"]
+ *               previewMp3Key:
+ *                 type: string
+ *                 example: previews/uuid.mp3
+ *               previewFileType:
+ *                 type: string
+ *                 example: audio/mpeg
+ *               regularWavKey:
+ *                 type: string
+ *                 example: regular/uuid.wav
+ *               fullZipKey:
+ *                 type: string
+ *                 example: full/uuid.zip
+ *               regularPriceUsd:
+ *                 type: string
+ *                 example: "19.99"
+ *               fullPriceUsd:
+ *                 type: string
+ *                 example: "49.99"
+ *     responses:
+ *       200:
+ *         description: Track created successfully.
+ *       400:
+ *         description: Validation error.
+ *       401:
+ *         description: Unauthorized.
+ *       403:
+ *         description: Only sellers and admins can upload tracks.
+ */
 export async function POST(req: Request) {
 	try {
 		const user = await getCurrentUser();
@@ -264,7 +333,10 @@ export async function POST(req: Request) {
 
 			if (!hasRegularFile && !hasRegularKey && !hasFullFile && !hasFullKey) {
 				return NextResponse.json(
-					{ error: "Please upload a WAV file, a ZIP file, or both to list this item for sale." },
+					{
+						error:
+							"Please upload a WAV file, a ZIP file, or both to list this item for sale.",
+					},
 					{ status: 400 },
 				);
 			}
