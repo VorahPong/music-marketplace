@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ConfirmModal from "@/app/components/ConfirmModal";
 
@@ -164,6 +164,17 @@ export default function CreatePageClient({
 	const [loading, setLoading] = useState(false);
 	const [deleteLoading, setDeleteLoading] = useState(false);
 	const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+	const [giftRecipientEmail, setGiftRecipientEmail] = useState("");
+	const [giftVersion, setGiftVersion] = useState<"REGULAR" | "FULL">(
+		initialTrack?.regularWavKey ? "REGULAR" : "FULL",
+	);
+	const [giftLoading, setGiftLoading] = useState(false);
+	const [giftError, setGiftError] = useState("");
+	const [giftSuccess, setGiftSuccess] = useState("");
+	const [giftRecipientStatus, setGiftRecipientStatus] = useState<
+		"idle" | "checking" | "found" | "not-found" | "error"
+	>("idle");
+	const [giftRecipientLabel, setGiftRecipientLabel] = useState("");
 	const [uploadedUrl, setUploadedUrl] = useState(
 		initialTrack?.previewMp3Url ?? "",
 	);
@@ -175,6 +186,70 @@ export default function CreatePageClient({
 		uploadedUrl?.startsWith("previews/") && uploadedTrackId
 			? `/api/tracks/${uploadedTrackId}/preview`
 			: uploadedUrl;
+
+	useEffect(() => {
+		if (!isEditMode || !initialTrack) return;
+
+		const email = giftRecipientEmail.trim().toLowerCase();
+
+		setGiftRecipientLabel("");
+		setGiftError("");
+
+		if (!email) {
+			setGiftRecipientStatus("idle");
+			return;
+		}
+
+		const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+		if (!isValidEmail) {
+			setGiftRecipientStatus("idle");
+			return;
+		}
+
+		const controller = new AbortController();
+
+		const timeoutId = window.setTimeout(async () => {
+			setGiftRecipientStatus("checking");
+
+			try {
+				const response = await fetch(
+					`/api/users/lookup-by-email?email=${encodeURIComponent(email)}`,
+					{ signal: controller.signal },
+				);
+
+				const data = await response.json();
+
+				if (!response.ok) {
+					setGiftRecipientStatus("error");
+					setGiftRecipientLabel(data.error || "Could not check this email.");
+					return;
+				}
+
+				if (data.user) {
+					setGiftRecipientStatus("found");
+					setGiftRecipientLabel(
+						data.user.name || data.user.handle || data.user.email,
+					);
+				} else {
+					setGiftRecipientStatus("not-found");
+					setGiftRecipientLabel("No account found with this email.");
+				}
+			} catch (error) {
+				if (error instanceof DOMException && error.name === "AbortError")
+					return;
+
+				console.error("Recipient lookup error:", error);
+				setGiftRecipientStatus("error");
+				setGiftRecipientLabel("Could not check this email.");
+			}
+		}, 500);
+
+		return () => {
+			window.clearTimeout(timeoutId);
+			controller.abort();
+		};
+	}, [giftRecipientEmail, initialTrack, isEditMode]);
 
 	function handlePreviewMp3Change(e: React.ChangeEvent<HTMLInputElement>) {
 		const selected = e.target.files?.[0];
@@ -198,8 +273,9 @@ export default function CreatePageClient({
 		if (!selected) return;
 
 		const isWav =
-			["audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"].includes(selected.type) ||
-			selected.name.toLowerCase().endsWith(".wav");
+			["audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave"].includes(
+				selected.type,
+			) || selected.name.toLowerCase().endsWith(".wav");
 
 		if (!isWav) {
 			setError("Regular version must be a WAV file.");
@@ -257,11 +333,15 @@ export default function CreatePageClient({
 		if (isForSale) {
 			const regularPrice = Number(regularPriceUsd);
 			const fullPrice = Number(fullPriceUsd);
-			const hasRegularVersion = Boolean(initialTrack?.regularWavKey || regularWavFile);
+			const hasRegularVersion = Boolean(
+				initialTrack?.regularWavKey || regularWavFile,
+			);
 			const hasFullVersion = Boolean(initialTrack?.fullZipKey || fullZipFile);
 
 			if (!hasRegularVersion && !hasFullVersion) {
-				setError("Please upload a WAV file, a ZIP file, or both to list this item for sale.");
+				setError(
+					"Please upload a WAV file, a ZIP file, or both to list this item for sale.",
+				);
 				return;
 			}
 
@@ -416,6 +496,65 @@ export default function CreatePageClient({
 		}
 	}
 
+	async function handleGiftTrack(e: React.FormEvent<HTMLFormElement>) {
+		e.preventDefault();
+
+		if (!isEditMode || !initialTrack) return;
+
+		setGiftError("");
+		setGiftSuccess("");
+
+		if (!giftRecipientEmail.trim()) {
+			setGiftError("Recipient email is required.");
+			return;
+		}
+
+		if (giftRecipientStatus !== "found") {
+			setGiftError("Please enter an email that belongs to an existing user.");
+			return;
+		}
+
+		if (giftVersion === "REGULAR" && !initialTrack.regularWavKey) {
+			setGiftError("This track does not have a regular WAV file to gift.");
+			return;
+		}
+
+		if (giftVersion === "FULL" && !initialTrack.fullZipKey) {
+			setGiftError("This track does not have a full ZIP file to gift.");
+			return;
+		}
+
+		setGiftLoading(true);
+
+		try {
+			const response = await fetch(`/api/tracks/${initialTrack.id}/gift`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					recipientEmail: giftRecipientEmail,
+					version: giftVersion,
+				}),
+			});
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				setGiftError(data.error || "Failed to send gift.");
+				return;
+			}
+
+			setGiftSuccess(data.message || "Gift sent successfully.");
+			setGiftRecipientEmail("");
+		} catch (error) {
+			console.error("Gift track error:", error);
+			setGiftError("Failed to send gift. Please try again.");
+		} finally {
+			setGiftLoading(false);
+		}
+	}
+
 	return (
 		<div className="min-h-screen bg-[#FAF8ED] px-4 text-[#4E3523]">
 			<div className="mx-auto mt-10 max-w-2xl">
@@ -428,27 +567,144 @@ export default function CreatePageClient({
 						: "Upload a fast MP3 preview for customers to stream. Add a protected WAV for the regular version and an optional ZIP for the full version."}
 				</p>
 
-				{isEditMode && initialTrack && (initialTrack.regularWavKey || initialTrack.fullZipKey) && (
-					<div className="mt-6 rounded-2xl border border-[#D6CFC7] bg-white p-4 shadow-sm">
-						<h2 className="text-sm font-semibold">Owner Downloads</h2>
-						<p className="mt-1 text-xs text-[#4E3523]/60">
-							Download the protected files attached to this track.
-						</p>
-						<div className="mt-4 flex flex-col gap-3 sm:flex-row">
-							{initialTrack.regularWavKey && (
-								<OwnerDownloadButton trackId={initialTrack.id} version="REGULAR">
-									Download WAV
-								</OwnerDownloadButton>
+				{isEditMode &&
+					initialTrack &&
+					(initialTrack.regularWavKey || initialTrack.fullZipKey) && (
+						<div className="mt-6 rounded-2xl border border-[#D6CFC7] bg-white p-4 shadow-sm">
+							<h2 className="text-sm font-semibold">Owner Downloads</h2>
+							<p className="mt-1 text-xs text-[#4E3523]/60">
+								Download the protected files attached to this track.
+							</p>
+							<div className="mt-4 flex flex-col gap-3 sm:flex-row">
+								{initialTrack.regularWavKey && (
+									<OwnerDownloadButton
+										trackId={initialTrack.id}
+										version="REGULAR"
+									>
+										Download WAV
+									</OwnerDownloadButton>
+								)}
+
+								{initialTrack.fullZipKey && (
+									<OwnerDownloadButton trackId={initialTrack.id} version="FULL">
+										Download ZIP
+									</OwnerDownloadButton>
+								)}
+							</div>
+						</div>
+					)}
+
+				{isEditMode &&
+					initialTrack &&
+					(initialTrack.regularWavKey || initialTrack.fullZipKey) && (
+						<form
+							onSubmit={handleGiftTrack}
+							className="mt-6 rounded-2xl border border-[#D6CFC7] bg-white p-4 shadow-sm"
+						>
+							<div className="flex flex-col gap-3 border-b border-[#D6CFC7] pb-4 sm:flex-row sm:items-start sm:justify-between">
+								<div>
+									<p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8A6A52]">
+										Gift access
+									</p>
+									<h2 className="mt-1 text-lg font-bold text-[#4E3523]">
+										Gift this beat
+									</h2>
+									<p className="mt-1 text-xs leading-5 text-[#4E3523]/60">
+										Give an existing user free access. This creates a $0
+										purchase so they can download it like a normal buyer.
+									</p>
+								</div>
+
+								<span className="w-fit rounded-full bg-[#FAF8ED] px-3 py-2 text-xs font-bold text-[#4E3523]">
+									$0 gift
+								</span>
+							</div>
+
+							<div className="mt-4 grid gap-4 md:grid-cols-[1fr_190px]">
+								<div>
+									<label className="mb-1 block text-sm font-medium">
+										Recipient Email
+									</label>
+									<input
+										type="email"
+										value={giftRecipientEmail}
+										onChange={(e) => setGiftRecipientEmail(e.target.value)}
+										placeholder="customer@example.com"
+										className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
+									/>
+
+									{giftRecipientStatus === "checking" && (
+										<p className="mt-2 text-xs font-semibold text-[#4E3523]/60">
+											Checking user...
+										</p>
+									)}
+
+									{giftRecipientStatus === "found" && (
+										<p className="mt-2 text-xs font-semibold text-green-700">
+											User found: {giftRecipientLabel}
+										</p>
+									)}
+
+									{giftRecipientStatus === "not-found" && (
+										<p className="mt-2 text-xs font-semibold text-red-600">
+											{giftRecipientLabel}
+										</p>
+									)}
+
+									{giftRecipientStatus === "error" && (
+										<p className="mt-2 text-xs font-semibold text-red-600">
+											{giftRecipientLabel}
+										</p>
+									)}
+								</div>
+
+								<div>
+									<label className="mb-1 block text-sm font-medium">
+										Version
+									</label>
+									<select
+										value={giftVersion}
+										onChange={(e) =>
+											setGiftVersion(e.target.value as "REGULAR" | "FULL")
+										}
+										className="w-full rounded-xl border border-[#D6CFC7] bg-white px-4 py-3 text-sm outline-none focus:border-[#4E3523]"
+									>
+										{initialTrack.regularWavKey && (
+											<option value="REGULAR">Regular WAV</option>
+										)}
+										{initialTrack.fullZipKey && (
+											<option value="FULL">Full ZIP / Stems</option>
+										)}
+									</select>
+								</div>
+							</div>
+
+							{giftError && (
+								<div className="mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-600">
+									{giftError}
+								</div>
 							)}
 
-							{initialTrack.fullZipKey && (
-								<OwnerDownloadButton trackId={initialTrack.id} version="FULL">
-									Download ZIP
-								</OwnerDownloadButton>
+							{giftSuccess && (
+								<div className="mt-4 rounded-xl border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-700">
+									{giftSuccess}
+								</div>
 							)}
-						</div>
-					</div>
-				)}
+
+							<button
+								type="submit"
+								disabled={
+									giftLoading ||
+									loading ||
+									deleteLoading ||
+									giftRecipientStatus !== "found"
+								}
+								className="mt-4 w-full rounded-xl bg-[#4E3523] px-4 py-3 text-sm font-semibold text-[#FAF8ED] hover:opacity-90 disabled:opacity-60 sm:w-auto"
+							>
+								{giftLoading ? "Sending Gift..." : "Send Gift"}
+							</button>
+						</form>
+					)}
 
 				<form
 					onSubmit={handleSubmit}
@@ -634,7 +890,9 @@ export default function CreatePageClient({
 									: "Public streaming preview. This should be optimized for fast playback."}
 							</p>
 
-							{previewMp3File && <SelectedFileCard file={previewMp3File} label="Selected MP3" />}
+							{previewMp3File && (
+								<SelectedFileCard file={previewMp3File} label="Selected MP3" />
+							)}
 						</div>
 
 						{isForSale && (
@@ -655,7 +913,12 @@ export default function CreatePageClient({
 											: "Optional. Add this if you want to sell a regular WAV version."}
 									</p>
 
-									{regularWavFile && <SelectedFileCard file={regularWavFile} label="Selected WAV" />}
+									{regularWavFile && (
+										<SelectedFileCard
+											file={regularWavFile}
+											label="Selected WAV"
+										/>
+									)}
 								</div>
 
 								<div>
@@ -674,7 +937,9 @@ export default function CreatePageClient({
 											: "Optional. Add this if you want to sell stems, license files, or project files."}
 									</p>
 
-									{fullZipFile && <SelectedFileCard file={fullZipFile} label="Selected ZIP" />}
+									{fullZipFile && (
+										<SelectedFileCard file={fullZipFile} label="Selected ZIP" />
+									)}
 								</div>
 							</>
 						)}
