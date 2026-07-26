@@ -103,6 +103,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 	}
 
 	const feedTracks = tracks.map((track) => {
+		const isRegularAvailable = Boolean(
+			track.regularWavKey &&
+				track.regularPriceCents &&
+				track.regularPriceCents > 0,
+		);
+		const isFullAvailable = Boolean(
+			track.fullZipKey && track.fullPriceCents && track.fullPriceCents > 0,
+		);
 		const userPurchases = Array.isArray(track.purchases) ? track.purchases : [];
 		const isRegularOwned = userPurchases.some(
 			(purchase) =>
@@ -135,7 +143,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 			likesCount: track._count.likes,
 			commentCount: track._count.comments,
 			isLiked: Array.isArray(track.likes) ? track.likes.length > 0 : false,
-			isForSale: track.isForSale,
+			isForSale:
+				track.isForSale && (isRegularAvailable || isFullAvailable),
+			isRegularAvailable,
+			isFullAvailable,
 			regularPriceCents: track.regularPriceCents,
 			fullPriceCents: track.fullPriceCents,
 			isRegularOwned,
