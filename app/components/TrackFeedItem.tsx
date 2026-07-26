@@ -40,6 +40,8 @@ type TrackFeedItemProps = {
 		isLiked: boolean;
 		commentCount: number;
 		isForSale?: boolean;
+		isRegularAvailable?: boolean;
+		isFullAvailable?: boolean;
 		regularPriceCents?: number | null;
 		fullPriceCents?: number | null;
 		isRegularOwned?: boolean;
@@ -82,7 +84,20 @@ export default function TrackFeedItem({
 	const isFullOwned = track.isFullOwned ?? false;
 	const regularPurchaseId = track.regularPurchaseId ?? null;
 	const fullPurchaseId = track.fullPurchaseId ?? null;
-	const hasFullVersion = Boolean(track.fullZipKey && track.fullPriceCents);
+	const isRegularAvailable =
+		track.isRegularAvailable ??
+		Boolean(
+			track.regularWavKey &&
+				track.regularPriceCents &&
+				track.regularPriceCents > 0,
+		);
+	const isFullAvailable =
+		track.isFullAvailable ??
+		Boolean(
+			track.fullZipKey && track.fullPriceCents && track.fullPriceCents > 0,
+		);
+	const hasPurchasableVersion =
+		Boolean(track.isForSale) && (isRegularAvailable || isFullAvailable);
 
 	const displayTrackType = track.trackType
 		? `#${track.trackType.charAt(0)}${track.trackType.slice(1).toLowerCase()}`
@@ -329,6 +344,8 @@ export default function TrackFeedItem({
 		}
 
 		if (buyLoadingVersion) return;
+		if (version === "REGULAR" && !isRegularAvailable) return;
+		if (version === "FULL" && !isFullAvailable) return;
 		if (version === "REGULAR" && regularOwned) return;
 		if (version === "FULL" && fullOwned) return;
 
@@ -507,56 +524,57 @@ export default function TrackFeedItem({
 							<Pencil size={16} />
 							Edit Track
 						</Link>
-					) : track.isForSale ? (
+					) : hasPurchasableVersion ? (
 						<div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-							{regularOwned ? (
-								<div className="flex flex-wrap items-center justify-end gap-2">
+							{isRegularAvailable &&
+								(regularOwned ? (
+									<div className="flex flex-wrap items-center justify-end gap-2">
+										<button
+											onClick={() => handleDownloadTrack("REGULAR")}
+											className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED]"
+										>
+											<Download size={16} />
+											Regular WAV
+										</button>
+
+										{regularPurchaseId && (
+											<>
+												<button
+													onClick={() =>
+														openPurchaseDocument(regularPurchaseId, "license")
+													}
+													className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
+												>
+													<FileText size={15} />
+													License
+												</button>
+
+												<button
+													onClick={() =>
+														openPurchaseDocument(regularPurchaseId, "receipt")
+													}
+													className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
+												>
+													<Receipt size={15} />
+													Receipt
+												</button>
+											</>
+										)}
+									</div>
+								) : (
 									<button
-										onClick={() => handleDownloadTrack("REGULAR")}
-										className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED]"
+										onClick={() => handleBuyTrack("REGULAR")}
+										disabled={buyLoadingVersion !== null}
+										className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED] disabled:opacity-60"
 									>
-										<Download size={16} />
-										Regular WAV
+										<ShoppingCart size={16} />
+										{buyLoadingVersion === "REGULAR"
+											? "Buying..."
+											: `Regular ${formatUsd(track.regularPriceCents)}`}
 									</button>
+								))}
 
-									{regularPurchaseId && (
-										<>
-											<button
-												onClick={() =>
-													openPurchaseDocument(regularPurchaseId, "license")
-												}
-												className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
-											>
-												<FileText size={15} />
-												License
-											</button>
-
-											<button
-												onClick={() =>
-													openPurchaseDocument(regularPurchaseId, "receipt")
-												}
-												className="flex items-center gap-2 rounded-full border border-[#D6CFC7] px-3 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#FAF8ED]"
-											>
-												<Receipt size={15} />
-												Receipt
-											</button>
-										</>
-									)}
-								</div>
-							) : (
-								<button
-									onClick={() => handleBuyTrack("REGULAR")}
-									disabled={buyLoadingVersion !== null}
-									className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED] disabled:opacity-60"
-								>
-									<ShoppingCart size={16} />
-									{buyLoadingVersion === "REGULAR"
-										? "Buying..."
-										: `Regular ${formatUsd(track.regularPriceCents)}`}
-								</button>
-							)}
-
-							{hasFullVersion &&
+							{isFullAvailable &&
 								(fullOwned ? (
 									<div className="flex flex-wrap items-center justify-end gap-2">
 										<button

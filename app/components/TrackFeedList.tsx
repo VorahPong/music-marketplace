@@ -23,6 +23,8 @@ type TrackFeedListProps = {
 		isLiked: boolean;
 		commentCount: number;
 		isForSale?: boolean;
+		isRegularAvailable?: boolean;
+		isFullAvailable?: boolean;
 		regularPriceCents?: number | null;
 		fullPriceCents?: number | null;
 		isRegularOwned?: boolean;
