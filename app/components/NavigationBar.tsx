@@ -5,11 +5,9 @@ import {
 	Menu,
 	Search,
 	Plus,
-	Bell,
 	LogOut,
 	Settings,
 	User,
-	Coins,
 	BarChart3,
 	LifeBuoy,
 } from "lucide-react";
@@ -30,13 +28,70 @@ type NavigationBarProps = {
 	} | null;
 };
 
-export default function NavigationBar({ user }: NavigationBarProps) {
-	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-	const [isProfileOpen, setIsProfileOpen] = useState(false);
+function NavigationSearch() {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
 	const [searchValue, setSearchValue] = useState(searchParams.get("q") ?? "");
+
+	function getMainHref(query: string) {
+		const params = new URLSearchParams();
+
+		if (pathname === "/main" && searchParams.get("view") === "customer") {
+			params.set("view", "customer");
+		}
+
+		if (query) {
+			params.set("q", query);
+		}
+
+		const queryString = params.toString();
+		return queryString ? `/main?${queryString}` : "/main";
+	}
+
+	function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault();
+		router.push(getMainHref(searchValue.trim()));
+	}
+
+	function handleClearSearch() {
+		setSearchValue("");
+		router.push(getMainHref(""));
+	}
+
+	return (
+		<form onSubmit={handleSearchSubmit} className="mx-6 max-w-xl flex-1">
+			<div className="flex items-center overflow-hidden rounded-full bg-[#FAF8ED]">
+				<input
+					type="text"
+					value={searchValue}
+					onChange={(event) => setSearchValue(event.target.value)}
+					placeholder="Search by title"
+					className="w-full bg-transparent px-4 py-2 text-sm text-[#4E3523] outline-none"
+				/>
+
+				{pathname === "/main" && searchValue.trim() && (
+					<button
+						type="button"
+						onClick={handleClearSearch}
+						className="px-2 text-xs font-medium text-[#4E3523]/60 hover:text-[#4E3523]"
+					>
+						Clear
+					</button>
+				)}
+
+				<button type="submit" className="px-4 text-[#4E3523]">
+					<Search size={18} />
+				</button>
+			</div>
+		</form>
+	);
+}
+
+export default function NavigationBar({ user }: NavigationBarProps) {
+	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+	const [isProfileOpen, setIsProfileOpen] = useState(false);
+	const searchParams = useSearchParams();
 
 	const profileRef = useRef<HTMLDivElement | null>(null);
 
@@ -55,28 +110,6 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 			document.removeEventListener("mousedown", handleClickOutside);
 		};
 	}, []);
-
-	useEffect(() => {
-		setSearchValue(searchParams.get("q") ?? "");
-	}, [searchParams]);
-
-	function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
-		event.preventDefault();
-
-		const trimmedSearch = searchValue.trim();
-
-		if (!trimmedSearch) {
-			router.push("/main");
-			return;
-		}
-
-		router.push(`/main?q=${encodeURIComponent(trimmedSearch)}`);
-	}
-
-	function handleClearSearch() {
-		setSearchValue("");
-		router.push("/main");
-	}
 
 	return (
 		<>
@@ -106,31 +139,7 @@ export default function NavigationBar({ user }: NavigationBarProps) {
 					</Link>
 				</div>
 
-				<form onSubmit={handleSearchSubmit} className="mx-6 max-w-xl flex-1">
-					<div className="flex items-center overflow-hidden rounded-full bg-[#FAF8ED]">
-						<input
-							type="text"
-							value={searchValue}
-							onChange={(event) => setSearchValue(event.target.value)}
-							placeholder="Search by title"
-							className="w-full bg-transparent px-4 py-2 text-sm text-[#4E3523] outline-none"
-						/>
-
-						{pathname === "/main" && searchValue.trim() && (
-							<button
-								type="button"
-								onClick={handleClearSearch}
-								className="px-2 text-xs font-medium text-[#4E3523]/60 hover:text-[#4E3523]"
-							>
-								Clear
-							</button>
-						)}
-
-						<button type="submit" className="px-4 text-[#4E3523]">
-							<Search size={18} />
-						</button>
-					</div>
-				</form>
+				<NavigationSearch key={searchParams.toString()} />
 
 				<div className="flex items-center gap-4">
 					{(user?.role === "SELLER" || user?.role === "ADMIN") && (
