@@ -50,6 +50,7 @@ type TrackFeedItemProps = {
 		regularPurchaseId?: string | null;
 		fullPurchaseId?: string | null;
 		isOwner?: boolean;
+		isCustomerPreview?: boolean;
 		owner?: {
 			name: string | null;
 			handle: string | null;
@@ -344,6 +345,7 @@ export default function TrackFeedItem({
 		}
 
 		if (buyLoadingVersion) return;
+		if (track.isCustomerPreview) return;
 		if (version === "REGULAR" && !isRegularAvailable) return;
 		if (version === "FULL" && !isFullAvailable) return;
 		if (version === "REGULAR" && regularOwned) return;
@@ -516,7 +518,7 @@ export default function TrackFeedItem({
 						Share
 					</button>
 
-					{track.isOwner ? (
+					{track.isOwner && !track.isCustomerPreview ? (
 						<Link
 							href={`/main/dashboard/edit/${track.id}`}
 							className="ml-auto flex items-center gap-2 rounded-full bg-[#FAF8ED] px-4 py-2 text-sm font-medium text-[#4E3523] hover:bg-[#EAD9C7]"
@@ -564,8 +566,17 @@ export default function TrackFeedItem({
 								) : (
 									<button
 										onClick={() => handleBuyTrack("REGULAR")}
-										disabled={buyLoadingVersion !== null}
-										className="flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED] disabled:opacity-60"
+										disabled={
+											buyLoadingVersion !== null || track.isCustomerPreview
+										}
+										title={
+											track.isCustomerPreview
+												? "Purchasing is disabled while previewing your own track"
+												: undefined
+										}
+										className={`flex items-center gap-2 rounded-full bg-[#4E3523] px-4 py-2 text-sm font-medium text-[#FAF8ED] disabled:cursor-not-allowed ${
+											buyLoadingVersion !== null ? "opacity-60" : ""
+										}`}
 									>
 										<ShoppingCart size={16} />
 										{buyLoadingVersion === "REGULAR"
@@ -612,8 +623,17 @@ export default function TrackFeedItem({
 								) : (
 									<button
 										onClick={() => handleBuyTrack("FULL")}
-										disabled={buyLoadingVersion !== null}
-										className="flex items-center gap-2 rounded-full border border-[#4E3523] px-4 py-2 text-sm font-medium text-[#4E3523] disabled:opacity-60"
+										disabled={
+											buyLoadingVersion !== null || track.isCustomerPreview
+										}
+										title={
+											track.isCustomerPreview
+												? "Purchasing is disabled while previewing your own track"
+												: undefined
+										}
+										className={`flex items-center gap-2 rounded-full border border-[#4E3523] px-4 py-2 text-sm font-medium text-[#4E3523] disabled:cursor-not-allowed ${
+											buyLoadingVersion !== null ? "opacity-60" : ""
+										}`}
 									>
 										<ShoppingCart size={16} />
 										{buyLoadingVersion === "FULL"

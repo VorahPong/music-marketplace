@@ -10,6 +10,7 @@ type HomePageProps = {
 	searchParams?: Promise<{
 		q?: string;
 		page?: string;
+		view?: string;
 	}>;
 };
 
@@ -18,6 +19,10 @@ const TRACKS_PER_PAGE = 12;
 export default async function HomePage({ searchParams }: HomePageProps) {
 	const user = await getCurrentUser();
 	const resolvedSearchParams = await searchParams;
+	const canUseCustomerView =
+		user?.role === "SELLER" || user?.role === "ADMIN";
+	const isCustomerView =
+		canUseCustomerView && resolvedSearchParams?.view === "customer";
 	const rawSearchQuery = resolvedSearchParams?.q?.trim() ?? "";
 	const searchQuery =
 		rawSearchQuery.length >= 2 ? rawSearchQuery.slice(0, 80) : "";
@@ -98,6 +103,29 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 			params.set("page", String(page));
 		}
 
+		if (isCustomerView) {
+			params.set("view", "customer");
+		}
+
+		const queryString = params.toString();
+		return queryString ? `/main?${queryString}` : "/main";
+	}
+
+	function getCustomerViewHref(enabled: boolean) {
+		const params = new URLSearchParams();
+
+		if (rawSearchQuery) {
+			params.set("q", rawSearchQuery);
+		}
+
+		if (currentPage > 1) {
+			params.set("page", String(currentPage));
+		}
+
+		if (enabled) {
+			params.set("view", "customer");
+		}
+
 		const queryString = params.toString();
 		return queryString ? `/main?${queryString}` : "/main";
 	}
@@ -155,6 +183,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 			regularPurchaseId: regularPurchase?.id ?? fullPurchase?.id ?? null,
 			fullPurchaseId: fullPurchase?.id ?? null,
 			isOwner: user?.id === track.ownerId,
+			isCustomerPreview:
+				isCustomerView && user?.id === track.ownerId,
 			owner: track.owner,
 		};
 	});
@@ -253,14 +283,40 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 								{searchQuery ? `Matching "${searchQuery}"` : "Browse available tracks"}
 							</h2>
 						</div>
-						<p className="rounded-full border border-[#D6CFC7] bg-white px-4 py-2 text-sm font-semibold text-[#4E3523]/75 shadow-sm">
-							{totalTracks === 0
-								? "0 tracks"
-								: `${visibleStart}-${visibleEnd} of ${totalTracks} ${
-										totalTracks === 1 ? "track" : "tracks"
+						<div className="flex flex-wrap items-center gap-2">
+							{canUseCustomerView && (
+								<Link
+									href={getCustomerViewHref(!isCustomerView)}
+									className={`rounded-full px-4 py-2 text-sm font-bold shadow-sm transition ${
+										isCustomerView
+											? "bg-[#4E3523] text-[#FAF8ED] hover:opacity-90"
+											: "border border-[#4E3523] bg-white text-[#4E3523] hover:bg-[#FAF8ED]"
 									}`}
-						</p>
+								>
+									{isCustomerView
+										? "Exit customer view"
+										: "View as customer"}
+								</Link>
+							)}
+							<p className="rounded-full border border-[#D6CFC7] bg-white px-4 py-2 text-sm font-semibold text-[#4E3523]/75 shadow-sm">
+								{totalTracks === 0
+									? "0 tracks"
+									: `${visibleStart}-${visibleEnd} of ${totalTracks} ${
+											totalTracks === 1 ? "track" : "tracks"
+										}`}
+							</p>
+						</div>
 					</div>
+
+					{isCustomerView && (
+						<div className="mb-5 rounded-2xl border border-[#8A6A52]/30 bg-[#EAD9C7]/50 px-5 py-4 text-sm text-[#4E3523]">
+							<p className="font-bold">Customer view is on</p>
+							<p className="mt-1 text-[#4E3523]/75">
+								Your tracks now show their customer-facing prices. Purchasing
+								your own tracks is disabled.
+							</p>
+						</div>
+					)}
 
 					{tracks.length === 0 ? (
 						<div className="overflow-hidden rounded-[2rem] border border-[#D6CFC7] bg-white shadow-sm">

@@ -33,6 +33,7 @@ type TrackFeedListProps = {
 		regularPurchaseId?: string | null;
 		fullPurchaseId?: string | null;
 		isOwner?: boolean;
+		isCustomerPreview?: boolean;
 		owner?: {
 			id: string;
 			name: string | null;
